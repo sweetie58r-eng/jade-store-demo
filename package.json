@@ -1,0 +1,14 @@
+{
+  "name": "jade-layout-demo",
+  "version": "0.1.0",
+  "description": "Local playable jade layout demo prototype built with Cocos Creator and TypeScript.",
+  "private": true,
+  "scripts": {
+    "check:json": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-json.ps1",
+    "check:config-naming": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/check-config-naming.ps1"
+  },
+  "creator": {
+    "version": "3.8.8"
+  },
+  "uuid": "d50cbf67-049c-4927-87f5-22650c939f2c"
+}

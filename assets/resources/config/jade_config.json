@@ -1,0 +1,38 @@
+{
+  "baseFillColor": "#cbd8c1",
+  "baseStrokeColor": "#52614e",
+  "outlineSmoothPasses": 2,
+  "sizeGrades": [
+    {
+      "id": "small",
+      "displayName": "小料",
+      "probability": 0.35,
+      "radiusRange": [150, 205],
+      "vertexCountRange": [16, 22],
+      "aspectRatioRange": [0.85, 1.2],
+      "regionCountRange": [2, 4]
+    },
+    {
+      "id": "medium",
+      "displayName": "中料",
+      "probability": 0.45,
+      "radiusRange": [205, 265],
+      "vertexCountRange": [20, 28],
+      "aspectRatioRange": [0.78, 1.28],
+      "regionCountRange": [3, 6]
+    },
+    {
+      "id": "large",
+      "displayName": "大料",
+      "probability": 0.2,
+      "radiusRange": [265, 330],
+      "vertexCountRange": [24, 34],
+      "aspectRatioRange": [0.72, 1.36],
+      "regionCountRange": [4, 8]
+    }
+  ],
+  "radiusNoise": {
+    "min": 0.78,
+    "max": 1.18
+  }
+}

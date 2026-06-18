@@ -1,0 +1,48 @@
+{
+  "jadeCost": {
+    "baseCost": 800,
+    "minCost": 600,
+    "areaCostFactor": 0.028,
+    "colorValueWeight": 0.28,
+    "shallowCrackDiscount": 0.025,
+    "deepCrackDiscount": 0.08,
+    "maxCrackDiscount": 0.35
+  },
+  "pricing": {
+    "invalidEstimateValue": 0,
+    "highValueColorMultiplierThreshold": 2.5,
+    "sizeUnderPower": 1.25,
+    "sizeOverGain": 0.28,
+    "minSizeCoefficient": 0.35,
+    "maxSizeCoefficient": 1.35,
+    "minMaterialQualityCoefficient": 0.15,
+    "maxMaterialQualityCoefficient": 2.4,
+    "colorValueWeight": 1.35,
+    "minColorValueCoefficient": 0.18,
+    "maxColorValueCoefficient": 6.8,
+    "concentrationWeight": 0.95,
+    "minConcentrationCoefficient": 0.52,
+    "maxConcentrationCoefficient": 2.1,
+    "themeMatchWeight": 0.65,
+    "minThemeColorCoefficient": 0.75,
+    "maxThemeColorCoefficient": 1.65,
+    "shallowCrackBasePenalty": 0.34,
+    "minCrackPenaltyCoefficient": 0.28,
+    "layoutSkillBonusRange": [1.0, 1.35],
+    "jackpotMultiplierRange": [3.0, 8.0],
+    "superJackpotMultiplierRange": [8.0, 15.0],
+    "jackpotProbabilityBase": 0.03
+  },
+  "revealPricing": {
+    "unknownAreaUnitValue": 0.18,
+    "revealedBaseUnitValue": 0.16,
+    "quoteScale": 1.18,
+    "colorValueWeight": 0.72,
+    "concentrationWeight": 0.18,
+    "lowValuePenaltyWeight": 0.5,
+    "shallowCrackPenaltyPerPx": 3.8,
+    "deepCrackPenaltyPerPx": 13.5,
+    "highValueCrackPenaltyMultiplier": 2.1,
+    "maxCrackPenaltyRatio": 0.72
+  }
+}

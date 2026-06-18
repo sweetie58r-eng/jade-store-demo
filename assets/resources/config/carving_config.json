@@ -1,0 +1,332 @@
+{
+  "shapes": [
+    {
+      "id": "small_bead",
+      "displayName": "小珠子",
+      "shortDisplayName": "珠子",
+      "description": "适合利用小块高浓度颜色的圆形小件。",
+      "category": "bead",
+      "shapeKind": "circle",
+      "basePrice": 18,
+      "carvingTime": 8,
+      "nominalArea": 500,
+      "minValidArea": 320,
+      "maxValidArea": 900,
+      "minScale": 0.75,
+      "maxScale": 1.35,
+      "crackSensitivity": 0.8,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 0.8,
+      "preferredColors": [
+        { "colorId": "vivid_green", "weight": 1.25 },
+        { "colorId": "deep_green", "weight": 1.18 },
+        { "colorId": "red", "weight": 1.15 },
+        { "colorId": "purple", "weight": 1.12 }
+      ],
+      "themeColorRules": {
+        "mode": "small_high_concentration",
+        "cleanlinessWeight": 0.15,
+        "concentrationWeight": 0.55,
+        "colorMatchWeight": 0.3
+      },
+      "geometry": {
+        "width": 26,
+        "height": 26,
+        "innerRadiusRatio": null,
+        "polygonPreset": "circle"
+      }
+    },
+    {
+      "id": "cabochon",
+      "displayName": "戒面 / 蛋面",
+      "shortDisplayName": "戒面",
+      "description": "偏好小块、高浓度、少裂的贵色区域。",
+      "category": "cabochon",
+      "shapeKind": "ellipse",
+      "basePrice": 120,
+      "carvingTime": 25,
+      "nominalArea": 1200,
+      "minValidArea": 780,
+      "maxValidArea": 2200,
+      "minScale": 0.7,
+      "maxScale": 1.45,
+      "crackSensitivity": 1.4,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.5,
+      "preferredColors": [
+        { "colorId": "vivid_green", "weight": 1.55 },
+        { "colorId": "deep_green", "weight": 1.35 },
+        { "colorId": "purple", "weight": 1.25 },
+        { "colorId": "red", "weight": 1.25 }
+      ],
+      "themeColorRules": {
+        "mode": "small_high_concentration",
+        "cleanlinessWeight": 0.25,
+        "concentrationWeight": 0.5,
+        "colorMatchWeight": 0.25
+      },
+      "geometry": {
+        "width": 40,
+        "height": 30,
+        "innerRadiusRatio": null,
+        "polygonPreset": "ellipse"
+      }
+    },
+    {
+      "id": "peace_buckle",
+      "displayName": "平安扣",
+      "shortDisplayName": "平安扣",
+      "description": "环形吊坠，偏好干净、均衡的颜色表现。",
+      "category": "pendant",
+      "shapeKind": "ring",
+      "basePrice": 180,
+      "carvingTime": 45,
+      "nominalArea": 2600,
+      "minValidArea": 1700,
+      "maxValidArea": 4300,
+      "minScale": 0.7,
+      "maxScale": 1.5,
+      "crackSensitivity": 1.2,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.2,
+      "preferredColors": [
+        { "colorId": "white", "weight": 1.1 },
+        { "colorId": "light_green", "weight": 1.15 },
+        { "colorId": "green", "weight": 1.25 },
+        { "colorId": "vivid_green", "weight": 1.35 }
+      ],
+      "themeColorRules": {
+        "mode": "balanced_clean_color",
+        "cleanlinessWeight": 0.35,
+        "concentrationWeight": 0.3,
+        "colorMatchWeight": 0.35
+      },
+      "geometry": {
+        "width": 64,
+        "height": 64,
+        "innerRadiusRatio": 0.36,
+        "polygonPreset": "ring"
+      }
+    },
+    {
+      "id": "jade_plaque",
+      "displayName": "玉牌",
+      "shortDisplayName": "玉牌",
+      "description": "大面积牌形雕件，重视表面干净度。",
+      "category": "pendant",
+      "shapeKind": "rect",
+      "basePrice": 220,
+      "carvingTime": 60,
+      "nominalArea": 4200,
+      "minValidArea": 2800,
+      "maxValidArea": 7000,
+      "minScale": 0.75,
+      "maxScale": 1.45,
+      "crackSensitivity": 1.0,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.0,
+      "preferredColors": [
+        { "colorId": "white", "weight": 1.1 },
+        { "colorId": "light_green", "weight": 1.15 },
+        { "colorId": "green", "weight": 1.2 },
+        { "colorId": "purple", "weight": 1.18 }
+      ],
+      "themeColorRules": {
+        "mode": "large_clean_surface",
+        "cleanlinessWeight": 0.45,
+        "concentrationWeight": 0.2,
+        "colorMatchWeight": 0.35
+      },
+      "geometry": {
+        "width": 56,
+        "height": 82,
+        "cornerRadius": 6,
+        "polygonPreset": "rounded_rect"
+      }
+    },
+    {
+      "id": "jade_bangle",
+      "displayName": "手镯",
+      "shortDisplayName": "手镯",
+      "description": "对裂纹非常敏感的环形雕件。",
+      "category": "bangle",
+      "shapeKind": "ring",
+      "basePrice": 880,
+      "carvingTime": 150,
+      "nominalArea": 7000,
+      "minValidArea": 5000,
+      "maxValidArea": 11000,
+      "minScale": 0.82,
+      "maxScale": 1.25,
+      "crackSensitivity": 2.4,
+      "deepCrackPolicy": "forbidden_on_inner_or_outer_edge",
+      "shallowCrackPenaltyMultiplier": 2.8,
+      "preferredColors": [
+        { "colorId": "white", "weight": 1.05 },
+        { "colorId": "light_green", "weight": 1.15 },
+        { "colorId": "green", "weight": 1.35 },
+        { "colorId": "vivid_green", "weight": 1.55 },
+        { "colorId": "deep_green", "weight": 1.35 }
+      ],
+      "themeColorRules": {
+        "mode": "continuous_clean_ring",
+        "cleanlinessWeight": 0.55,
+        "concentrationWeight": 0.2,
+        "colorMatchWeight": 0.25
+      },
+      "geometry": {
+        "width": 120,
+        "height": 120,
+        "innerRadiusRatio": 0.62,
+        "edgeCheckBandWidth": 6,
+        "polygonPreset": "ring"
+      },
+      "futureExtensions": {
+        "coreMaterialReuse": true,
+        "implementedInPhaseOne": false
+      }
+    },
+    {
+      "id": "pixiu",
+      "displayName": "貔貅",
+      "shortDisplayName": "貔貅",
+      "description": "偏好正绿、深绿、黄、红等吉祥色。",
+      "category": "figure",
+      "shapeKind": "irregular",
+      "basePrice": 520,
+      "carvingTime": 120,
+      "nominalArea": 6200,
+      "minValidArea": 4100,
+      "maxValidArea": 9800,
+      "minScale": 0.72,
+      "maxScale": 1.45,
+      "crackSensitivity": 1.35,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.35,
+      "preferredColors": [
+        { "colorId": "vivid_green", "weight": 1.45 },
+        { "colorId": "deep_green", "weight": 1.35 },
+        { "colorId": "yellow", "weight": 1.35 },
+        { "colorId": "red", "weight": 1.3 }
+      ],
+      "themeColorRules": {
+        "mode": "auspicious_color",
+        "cleanlinessWeight": 0.25,
+        "concentrationWeight": 0.35,
+        "colorMatchWeight": 0.4
+      },
+      "geometry": {
+        "width": 86,
+        "height": 68,
+        "polygonPreset": "pixiu_silhouette"
+      }
+    },
+    {
+      "id": "buddha_guanyin",
+      "displayName": "佛像 / 观音",
+      "shortDisplayName": "佛像",
+      "description": "偏好干净、少裂的白、浅绿、紫、正绿区域。",
+      "category": "figure",
+      "shapeKind": "irregular",
+      "basePrice": 680,
+      "carvingTime": 160,
+      "nominalArea": 7600,
+      "minValidArea": 5200,
+      "maxValidArea": 11800,
+      "minScale": 0.75,
+      "maxScale": 1.4,
+      "crackSensitivity": 1.8,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.8,
+      "preferredColors": [
+        { "colorId": "white", "weight": 1.25 },
+        { "colorId": "light_green", "weight": 1.2 },
+        { "colorId": "purple", "weight": 1.25 },
+        { "colorId": "vivid_green", "weight": 1.3 }
+      ],
+      "themeColorRules": {
+        "mode": "clean_sacred_figure",
+        "cleanlinessWeight": 0.55,
+        "concentrationWeight": 0.2,
+        "colorMatchWeight": 0.25
+      },
+      "geometry": {
+        "width": 74,
+        "height": 104,
+        "polygonPreset": "buddha_guanyin_silhouette"
+      }
+    },
+    {
+      "id": "jade_cabbage",
+      "displayName": "玉白菜",
+      "shortDisplayName": "白菜",
+      "description": "偏好白色与绿色组合。",
+      "category": "figure",
+      "shapeKind": "irregular",
+      "basePrice": 620,
+      "carvingTime": 140,
+      "nominalArea": 7200,
+      "minValidArea": 4800,
+      "maxValidArea": 11200,
+      "minScale": 0.75,
+      "maxScale": 1.45,
+      "crackSensitivity": 1.25,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 1.25,
+      "preferredColors": [
+        { "colorId": "white", "weight": 1.3 },
+        { "colorId": "gray_white", "weight": 1.05 },
+        { "colorId": "light_green", "weight": 1.25 },
+        { "colorId": "green", "weight": 1.35 },
+        { "colorId": "vivid_green", "weight": 1.45 }
+      ],
+      "themeColorRules": {
+        "mode": "white_green_combo",
+        "cleanlinessWeight": 0.25,
+        "concentrationWeight": 0.25,
+        "colorMatchWeight": 0.5
+      },
+      "geometry": {
+        "width": 82,
+        "height": 102,
+        "polygonPreset": "cabbage_silhouette"
+      }
+    },
+    {
+      "id": "landscape_ornament",
+      "displayName": "山水摆件",
+      "shortDisplayName": "山水",
+      "description": "偏好彩色、墨色、绿色和黄色的复杂区域。",
+      "category": "ornament",
+      "shapeKind": "irregular",
+      "basePrice": 760,
+      "carvingTime": 220,
+      "nominalArea": 12500,
+      "minValidArea": 8500,
+      "maxValidArea": 21000,
+      "minScale": 0.8,
+      "maxScale": 1.55,
+      "crackSensitivity": 0.95,
+      "deepCrackPolicy": "forbidden",
+      "shallowCrackPenaltyMultiplier": 0.95,
+      "preferredColors": [
+        { "colorId": "mixed", "weight": 1.45 },
+        { "colorId": "ink", "weight": 1.3 },
+        { "colorId": "green", "weight": 1.25 },
+        { "colorId": "yellow", "weight": 1.2 },
+        { "colorId": "deep_green", "weight": 1.2 }
+      ],
+      "themeColorRules": {
+        "mode": "landscape_multicolor",
+        "cleanlinessWeight": 0.2,
+        "concentrationWeight": 0.25,
+        "colorMatchWeight": 0.55
+      },
+      "geometry": {
+        "width": 138,
+        "height": 98,
+        "polygonPreset": "landscape_silhouette"
+      }
+    }
+  ]
+}
