@@ -4,7 +4,7 @@ import { LoadedGameConfigs } from '../config/GameConfigTypes';
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
 import { JadeGenerator } from '../core/generator/JadeGenerator';
 import { SeededRandom } from '../core/random/SeededRandom';
-import { MarketStoneData, ProcessingJobData, DailySalesResult, EstimatedProductData, FinishedProductData } from '../data/BusinessTypes';
+import { MarketStoneData, ProcessingJobData, DailySalesResult, EstimatedProductData, FinishedProductData, ProductStatus } from '../data/BusinessTypes';
 import { PlacedCarvingData } from '../data/CarvingTypes';
 import { JadePieceData, Vec2Data } from '../data/JadeTypes';
 import { LayoutSettlementResult } from '../data/SettlementTypes';
@@ -19,6 +19,7 @@ const PORTRAIT_HEIGHT = 1280;
 const JADE_WORK_AREA = { x: -330, y: -338, width: 660, height: 770 };
 const SALES_EVENT_INTERVAL_SECONDS = 0.62;
 const PROCESSING_ANIMATION_SECONDS = 1.35;
+const DEFAULT_SHELF_SLOT_COUNT = 6;
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 
@@ -216,6 +217,7 @@ export class MvpGameController extends Component {
     this.processingJobs.push({
       id: `processing_job_${this.jobCounter.toString().padStart(3, '0')}`,
       sourceStoneId: stone.id,
+      materialQualityId: stone.jade.materialQualityId,
       placedCarvings,
       estimatedProducts,
       finishDay: this.day + 1
@@ -331,6 +333,7 @@ export class MvpGameController extends Component {
     for (const job of completedJobs) {
       completedProductCount += this.finishProcessingJob(job);
     }
+    this.autoShelfInventoryProducts();
 
     this.activeSalesSession = this.prepareDailySales(completedProductCount);
     this.syncSalesResultFromSession();
@@ -357,15 +360,36 @@ export class MvpGameController extends Component {
         displayName: estimate.displayName,
         estimatedPrice: estimate.estimatedPrice,
         finalSellPrice,
+        listedPrice: finalSellPrice,
+        status: 'in_inventory',
+        sourceStoneId: job.sourceStoneId,
+        materialQualityId: job.materialQualityId,
         colorSummary: estimate.colorSummary,
         crackPenalty: estimate.crackPenalty,
-        sourceStoneId: job.sourceStoneId,
+        createdDay: this.day,
+        soldDay: null,
         isSold: false,
         canDisplay: true
       });
     }
 
     return completedCount;
+  }
+
+  private autoShelfInventoryProducts(): void {
+    const openSlots = Math.max(0, DEFAULT_SHELF_SLOT_COUNT - this.countProductsByStatus('on_shelf'));
+    if (openSlots === 0) {
+      return;
+    }
+
+    const productsToShelf = this.finishedProducts
+      .filter((product) => product.status === 'in_inventory')
+      .slice(0, openSlots);
+
+    for (const product of productsToShelf) {
+      product.status = 'on_shelf';
+      product.isSold = false;
+    }
   }
 
   private prepareDailySales(completedProductCount: number): SalesSessionData {
@@ -390,18 +414,18 @@ export class MvpGameController extends Component {
     const plannedSoldIds = new Set<string>();
     const customerCount = this.configs.demoLevel.economy.dailyCustomerCount;
     const shelfProductIds = this.finishedProducts
-      .filter((product) => !product.isSold)
-      .slice(0, 6)
+      .filter((product) => product.status === 'on_shelf')
+      .slice(0, DEFAULT_SHELF_SLOT_COUNT)
       .map((product) => product.id);
 
     for (let customerIndex = 0; customerIndex < customerCount; customerIndex += 1) {
-      const availableProducts = this.finishedProducts.filter((product) => shelfProductIds.includes(product.id) && !product.isSold && !plannedSoldIds.has(product.id));
+      const availableProducts = this.finishedProducts.filter((product) => shelfProductIds.includes(product.id) && product.status === 'on_shelf' && !plannedSoldIds.has(product.id));
       if (availableProducts.length === 0) {
         break;
       }
 
       const product = this.pickProductForCustomer(availableProducts, random);
-      const sellChance = clamp(0.95 - product.finalSellPrice / 8500, 0.18, 0.86);
+      const sellChance = clamp(0.95 - product.listedPrice / 8500, 0.18, 0.86);
       const purchased = random.chance(sellChance);
       if (purchased) {
         plannedSoldIds.add(product.id);
@@ -553,7 +577,10 @@ export class MvpGameController extends Component {
 
   private createSalesProductCards(): void {
     const soldIds = new Set(this.lastSalesResult.soldProducts.map((product) => product.id));
-    const shelfIds = this.activeSalesSession?.shelfProductIds ?? this.finishedProducts.filter((product) => !product.isSold).slice(0, 6).map((product) => product.id);
+    const shelfIds = this.activeSalesSession?.shelfProductIds ?? this.finishedProducts
+      .filter((product) => product.status === 'on_shelf')
+      .slice(0, DEFAULT_SHELF_SLOT_COUNT)
+      .map((product) => product.id);
     const products = shelfIds
       .map((productId) => this.finishedProducts.find((product) => product.id === productId) ?? null)
       .filter((product): product is FinishedProductData => product !== null);
@@ -583,7 +610,8 @@ export class MvpGameController extends Component {
 
   private createProductCard(product: FinishedProductData, status: ProductSaleStatus, x: number, y: number): void {
     let card = this.node.getChildByName(`ProductCard_${product.id}`);
-    const statusKey = `${status}:${product.finalSellPrice}`;
+    const visiblePrice = status === 'sold' ? product.finalSellPrice : product.listedPrice;
+    const statusKey = `${status}:${visiblePrice}`;
     if (!card) {
       card = new Node(`ProductCard_${product.id}`);
       this.node.addChild(card);
@@ -613,7 +641,7 @@ export class MvpGameController extends Component {
     this.createTextNode(card, `ProductName_${product.id}`, product.displayName, 0, 64, 19, new Color(44, 48, 42, 255), 158);
     const pricePrefix = soldToday ? this.getText('priceLabel') : this.getText('listedPriceLabel');
     const priceColor = soldToday ? new Color(43, 142, 62, 255) : new Color(88, 72, 52, 255);
-    this.createTextNode(card, `ProductPrice_${product.id}`, `${pricePrefix} +${product.finalSellPrice}`, 0, -50, 18, priceColor, 158);
+    this.createTextNode(card, `ProductPrice_${product.id}`, `${pricePrefix} +${visiblePrice}`, 0, -50, 18, priceColor, 158);
     this.createProductStatusTag(card, product, status);
   }
 
@@ -694,7 +722,7 @@ export class MvpGameController extends Component {
 
   private pickProductForCustomer(products: FinishedProductData[], random: SeededRandom): FinishedProductData {
     const bias = this.configs?.demoLevel.economy.lowPriceSellBias ?? 1.35;
-    const weights = products.map((product) => 1 / Math.pow(Math.max(1, product.finalSellPrice), bias));
+    const weights = products.map((product) => 1 / Math.pow(Math.max(1, product.listedPrice), bias));
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     let cursor = random.range(0, total);
 
@@ -773,8 +801,10 @@ export class MvpGameController extends Component {
     const product = event.productId ? this.finishedProducts.find((item) => item.id === event.productId) ?? null : null;
     const customerNumber = event.customerIndex + 1;
 
-    if (event.purchased && product && !product.isSold) {
+    if (event.purchased && product && product.status === 'on_shelf') {
+      product.status = 'sold';
       product.isSold = true;
+      product.soldDay = this.day;
       session.soldCount += 1;
       session.income += product.finalSellPrice;
       session.soldProductIds.push(product.id);
@@ -813,7 +843,7 @@ export class MvpGameController extends Component {
       income: session.income,
       customerCount: session.customerCount,
       completedProductCount: session.completedProductCount,
-      unsoldCount: this.finishedProducts.filter((product) => !product.isSold).length,
+      unsoldCount: this.finishedProducts.filter((product) => product.status !== 'sold').length,
       soldProducts: this.finishedProducts.filter((product) => soldIdSet.has(product.id))
     };
   }
@@ -1035,18 +1065,23 @@ export class MvpGameController extends Component {
   }
 
   private createProductSummary(): void {
-    const unsoldCount = this.finishedProducts.filter((product) => !product.isSold).length;
-    const soldCount = this.finishedProducts.filter((product) => product.isSold).length;
+    const inventoryCount = this.countProductsByStatus('in_inventory');
+    const shelfCount = this.countProductsByStatus('on_shelf');
+    const soldCount = this.countProductsByStatus('sold');
     this.createTextNode(
       this.node,
       'ProductSummaryText',
-      `${this.getText('productStorageTitle')}: ${unsoldCount}\n${this.getText('soldTodayLabel')}: ${soldCount}`,
+      `${this.getText('productStorageTitle')}: ${inventoryCount + shelfCount}\n${this.getText('pendingSaleStatusLabel')}: ${shelfCount}\n${this.getText('soldTodayLabel')}: ${soldCount}`,
       -190,
       -350,
       22,
       new Color(50, 58, 50, 255),
       280
     );
+  }
+
+  private countProductsByStatus(status: ProductStatus): number {
+    return this.finishedProducts.filter((product) => product.status === status).length;
   }
 
   private createCommercialPlaceholderPanel(): void {
@@ -1210,8 +1245,10 @@ export class MvpGameController extends Component {
       return;
     }
 
-    const unsoldCount = this.finishedProducts.filter((product) => !product.isSold).length;
-    this.debugLabel.string = `Day: ${this.day} | coins: ${this.coins} | market: ${this.marketStones.length} | jobs: ${this.processingJobs.length} | products: ${unsoldCount}`;
+    const inventoryCount = this.countProductsByStatus('in_inventory');
+    const shelfCount = this.countProductsByStatus('on_shelf');
+    const soldCount = this.countProductsByStatus('sold');
+    this.debugLabel.string = `Day: ${this.day} | coins: ${this.coins} | market: ${this.marketStones.length} | jobs: ${this.processingJobs.length} | inventory: ${inventoryCount} | shelf: ${shelfCount} | sold: ${soldCount}`;
   }
 
   private getText(key: string): string {

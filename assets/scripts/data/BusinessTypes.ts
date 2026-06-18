@@ -22,10 +22,13 @@ export interface EstimatedProductData {
 export interface ProcessingJobData {
   id: string;
   sourceStoneId: string;
+  materialQualityId: string;
   placedCarvings: PlacedCarvingData[];
   estimatedProducts: EstimatedProductData[];
   finishDay: number;
 }
+
+export type ProductStatus = 'in_inventory' | 'on_shelf' | 'sold';
 
 export interface FinishedProductData {
   id: string;
@@ -33,9 +36,14 @@ export interface FinishedProductData {
   displayName: string;
   estimatedPrice: number;
   finalSellPrice: number;
+  listedPrice: number;
+  status: ProductStatus;
+  sourceStoneId: string;
+  materialQualityId: string;
   colorSummary: string;
   crackPenalty: number;
-  sourceStoneId: string;
+  createdDay: number;
+  soldDay: number | null;
   isSold: boolean;
   canDisplay: boolean;
 }
