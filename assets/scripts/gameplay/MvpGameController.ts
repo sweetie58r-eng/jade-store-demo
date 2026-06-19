@@ -431,7 +431,6 @@ export class MvpGameController extends Component {
       };
     }
 
-    const random = new SeededRandom(this.configs.demoLevel.seed + this.day * 7919 + this.finishedProducts.length * 13);
     const events: SalesEventData[] = [];
     const plannedSoldIds = new Set<string>();
     const customerCount = this.configs.demoLevel.economy.dailyCustomerCount;
@@ -446,17 +445,13 @@ export class MvpGameController extends Component {
         break;
       }
 
-      const product = this.pickProductForCustomer(availableProducts, random);
-      const sellChance = clamp(0.95 - product.listedPrice / 8500, 0.18, 0.86);
-      const purchased = random.chance(sellChance);
-      if (purchased) {
-        plannedSoldIds.add(product.id);
-      }
+      const product = availableProducts[0];
+      plannedSoldIds.add(product.id);
 
       events.push({
         customerIndex,
         productId: product.id,
-        purchased
+        purchased: true
       });
 
       if (plannedSoldIds.size >= shelfProductIds.length) {
