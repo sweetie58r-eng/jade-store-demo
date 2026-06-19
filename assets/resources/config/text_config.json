@@ -49,6 +49,7 @@
     "unlistProductButton": "下架",
     "shelfSlotLabel": "摊位槽位",
     "shelfFullMessage": "摊位已满",
+    "emptyShelfSlotLabel": "空位",
     "productListedMessage": "商品已上架",
     "productUnlistedMessage": "商品已下架",
     "noShelfProductsMessage": "请先上架商品",

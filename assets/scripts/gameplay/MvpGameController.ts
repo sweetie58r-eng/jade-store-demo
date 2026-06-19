@@ -895,7 +895,7 @@ export class MvpGameController extends Component {
         `InventoryTab_${tab.filter}`,
         this.getText(tab.labelKey),
         tab.x,
-        462,
+        438,
         140,
         48,
         isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
@@ -911,30 +911,44 @@ export class MvpGameController extends Component {
   private createShelfInfoPanel(): void {
     const shelfCount = this.countProductsByStatus('on_shelf');
     const shelfSlotCount = this.getShelfSlotCount();
-    this.drawPanel(this.getGraphicsForNode(this.node, 'InventoryInfoPanel'), 620, 70, new Color(255, 247, 218, 230), new Color(90, 75, 55, 255), { x: 0, y: 398 });
+    this.drawPanel(this.getGraphicsForNode(this.node, 'InventoryInfoPanel'), 620, 72, new Color(255, 247, 218, 230), new Color(90, 75, 55, 255), { x: 0, y: 358 });
     this.createTextNode(
       this.node,
       'InventoryInfoText',
       `${this.getText('shelfSlotLabel')}: ${shelfCount}/${shelfSlotCount}    ${this.getText('productStorageTitle')}: ${this.getActiveProductCount()}`,
       0,
-      388,
+      352,
       22,
       new Color(48, 58, 48, 255),
       580
     );
-    this.createTextNode(this.node, 'InventoryStatusMessage', this.statusMessage, 0, 354, 19, new Color(80, 64, 48, 230), 580);
+    this.createTextNode(this.node, 'InventoryStatusMessage', this.statusMessage, 0, 322, 18, new Color(80, 64, 48, 230), 580);
   }
 
   private createInventoryProductCards(filter: InventoryFilter): void {
     const products = this.getFilteredProducts(filter).slice(0, 6);
     const positions = [
-      { x: -205, y: 224 },
-      { x: 0, y: 224 },
-      { x: 205, y: 224 },
-      { x: -205, y: -8 },
-      { x: 0, y: -8 },
-      { x: 205, y: -8 }
+      { x: -205, y: 175 },
+      { x: 0, y: 175 },
+      { x: 205, y: 175 },
+      { x: -205, y: -72 },
+      { x: 0, y: -72 },
+      { x: 205, y: -72 }
     ];
+
+    if (filter === 'on_shelf') {
+      const shelfSlotCount = Math.min(this.getShelfSlotCount(), positions.length);
+      for (let index = 0; index < shelfSlotCount; index += 1) {
+        const position = positions[index];
+        const product = products[index];
+        if (product) {
+          this.createInventoryProductCard(product, position.x, position.y);
+        } else {
+          this.createEmptyShelfSlotCard(index, position.x, position.y);
+        }
+      }
+      return;
+    }
 
     if (products.length === 0) {
       this.createTextNode(this.node, 'InventoryEmptyHint', this.getText('emptyInventoryHint'), 0, 92, 28, new Color(78, 70, 58, 255), 520);
@@ -952,46 +966,71 @@ export class MvpGameController extends Component {
     this.node.addChild(card);
     card.layer = this.node.layer;
     card.setPosition(new Vec3(x, y, 2));
-    card.addComponent(UITransform).setContentSize(188, 216);
+    card.addComponent(UITransform).setContentSize(188, 226);
     const graphics = card.addComponent(Graphics);
     const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
-    this.drawPanel(graphics, 188, 216, new Color(255, 252, 238, 250), borderColor);
-    this.drawProductIcon(graphics, product, product.status === 'sold');
+    this.drawPanel(graphics, 188, 226, new Color(255, 252, 238, 250), borderColor);
+    this.drawInventoryPreviewIcon(graphics, product);
 
-    this.createTextNode(card, `InventoryProductName_${product.id}`, product.displayName, 0, 72, 18, new Color(44, 48, 42, 255), 160);
-    this.createTextNode(card, `InventoryProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 42, 17, new Color(88, 72, 52, 255), 160);
-    this.createTextNode(card, `InventoryProductStatus_${product.id}`, this.getProductStatusText(product.status), 0, 12, 17, this.getProductStatusColor(product.status), 160);
+    this.createTextNode(card, `InventoryProductName_${product.id}`, product.displayName, 0, 88, 19, new Color(44, 48, 42, 255), 160);
     this.createTextNode(
       card,
       `InventoryProductMeta_${product.id}`,
       `${this.getMaterialQualityDisplayName(product.materialQualityId)} / ${this.getColorSummaryDisplayName(product.colorSummary)}`,
-      0,
-      -18,
-      14,
+      22,
+      45,
+      15,
       new Color(78, 70, 58, 230),
-      160
+      120
     );
+    this.createTextNode(card, `InventoryProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 16, 17, new Color(88, 72, 52, 255), 160);
+    this.createTextNode(card, `InventoryProductStatus_${product.id}`, this.getProductStatusText(product.status), 0, -13, 17, this.getProductStatusColor(product.status), 160);
 
     if (product.crackPenalty > 0) {
-      this.createButton(card, `InventoryCrackPenalty_${product.id}`, this.getText('crackPenaltyTag'), 42, -47, 78, 24, new Color(255, 229, 220, 255), new Color(174, 80, 62, 255), () => undefined, 13);
+      this.createButton(card, `InventoryCrackPenalty_${product.id}`, this.getText('crackPenaltyTag'), 0, -43, 88, 24, new Color(255, 229, 220, 255), new Color(174, 80, 62, 255), () => undefined, 13);
     }
 
     if (product.status === 'in_inventory') {
-      this.createButton(card, `ListProduct_${product.id}`, this.getText('listProductButton'), 0, -84, 108, 32, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+      this.createButton(card, `ListProduct_${product.id}`, this.getText('listProductButton'), 0, -90, 112, 34, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
         this.listProduct(product.id);
       }, 16);
     } else if (product.status === 'on_shelf') {
-      this.createButton(card, `UnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -84, 108, 32, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+      this.createButton(card, `UnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -90, 112, 34, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
         this.unlistProduct(product.id);
       }, 16);
     }
   }
 
+  private drawInventoryPreviewIcon(graphics: Graphics, product: FinishedProductData): void {
+    const color = this.getProductIconColor(product.colorSummary);
+    graphics.fillColor = new Color(color.r, color.g, color.b, product.status === 'sold' ? 130 : 210);
+    graphics.strokeColor = new Color(45, 76, 62, 210);
+    graphics.lineWidth = 2;
+    graphics.circle(-64, 45, 14);
+    graphics.fill();
+    graphics.stroke();
+  }
+
+  private createEmptyShelfSlotCard(slotIndex: number, x: number, y: number): void {
+    const card = new Node(`EmptyShelfSlot_${slotIndex}`);
+    this.node.addChild(card);
+    card.layer = this.node.layer;
+    card.setPosition(new Vec3(x, y, 2));
+    card.addComponent(UITransform).setContentSize(188, 226);
+    const graphics = card.addComponent(Graphics);
+    this.drawPanel(graphics, 188, 226, new Color(246, 241, 226, 190), new Color(118, 104, 86, 170));
+    graphics.strokeColor = new Color(118, 104, 86, 150);
+    graphics.lineWidth = 2;
+    graphics.rect(-64, -72, 128, 144);
+    graphics.stroke();
+    this.createTextNode(card, `EmptyShelfSlotText_${slotIndex}`, this.getText('emptyShelfSlotLabel'), 0, 2, 23, new Color(96, 84, 68, 210), 150);
+  }
+
   private createInventoryActions(): void {
-    this.createButton(this.node, 'InventoryBackMarketButton', this.getText('backMarketButton'), -170, -548, 210, 60, new Color(248, 241, 221, 255), new Color(98, 83, 64, 255), () => {
+    this.createButton(this.node, 'InventoryBackMarketButton', this.getText('backMarketButton'), -170, -565, 220, 62, new Color(248, 241, 221, 255), new Color(98, 83, 64, 255), () => {
       this.showMarket();
     }, 21);
-    this.createButton(this.node, 'InventoryStartSalesButton', this.getText('startSalesButton'), 170, -548, 210, 60, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+    this.createButton(this.node, 'InventoryStartSalesButton', this.getText('startSalesButton'), 170, -565, 220, 62, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
       this.startDailySales();
     }, 21);
   }
