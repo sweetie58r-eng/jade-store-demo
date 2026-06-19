@@ -1,4 +1,4 @@
-import { Color, Component, EventTouch, Graphics, Label, Node, UITransform, Vec3, _decorator } from 'cc';
+import { Color, Component, EventTouch, Graphics, Label, Mask, Node, ScrollView, UITransform, Vec3, _decorator } from 'cc';
 
 import { LoadedGameConfigs } from '../config/GameConfigTypes';
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
@@ -23,7 +23,12 @@ const DEFAULT_SHELF_SLOT_COUNT = 6;
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
-const INVENTORY_PRODUCTS_PER_PAGE = 6;
+const WAREHOUSE_COLUMNS = 3;
+const WAREHOUSE_CARD_WIDTH = 198;
+const WAREHOUSE_CARD_HEIGHT = 146;
+const WAREHOUSE_ROW_GAP = 166;
+const WAREHOUSE_VIEW_WIDTH = 650;
+const WAREHOUSE_VIEW_HEIGHT = 660;
 
 interface SalesEventData {
   customerIndex: number;
@@ -65,7 +70,6 @@ export class MvpGameController extends Component {
   private processingSequenceToken = 0;
   private productCardStatus = new Map<string, string>();
   private inventoryFilter: InventoryFilter = 'all';
-  private inventoryPage = 0;
   private newlyCompletedProductCount = 0;
   private jobCounter = 0;
   private productCounter = 0;
@@ -92,7 +96,6 @@ export class MvpGameController extends Component {
     this.salesSequenceToken = 0;
     this.processingSequenceToken = 0;
     this.inventoryFilter = 'all';
-    this.inventoryPage = 0;
     this.newlyCompletedProductCount = 0;
     this.productCardStatus.clear();
     this.statusMessage = this.getText('marketRefreshedMessage');
@@ -126,7 +129,7 @@ export class MvpGameController extends Component {
     this.createProductSummary();
     this.createCommercialPlaceholderPanel();
     this.createButton(this.node, 'InventoryButton', this.getText('inventoryButton'), -246, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
-      this.showInventoryManagement('all', 0);
+      this.showInventoryManagement('all');
     }, 20);
     this.createButton(this.node, 'StallButton', this.getText('stallButton'), -82, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
       this.showInventoryManagement('on_shelf');
@@ -358,7 +361,7 @@ export class MvpGameController extends Component {
         : this.getText('marketRefreshedMessage');
 
     if (completedProductCount > 0) {
-      this.showInventoryManagement('all', 0);
+      this.showInventoryManagement('all');
     } else {
       this.showMarket();
     }
@@ -401,7 +404,7 @@ export class MvpGameController extends Component {
   private startDailySales(): void {
     if (this.countProductsByStatus('on_shelf') < 1) {
       this.statusMessage = this.getText('noShelfProductsMessage');
-      this.showInventoryManagement('all', this.inventoryPage);
+      this.showInventoryManagement('all');
       return;
     }
 
@@ -867,11 +870,9 @@ export class MvpGameController extends Component {
     };
   }
 
-  private showInventoryManagement(filter: InventoryFilter, page?: number): void {
+  private showInventoryManagement(filter: InventoryFilter): void {
     this.shutdownWorkLayers();
-    const filterChanged = this.inventoryFilter !== filter;
     this.inventoryFilter = filter;
-    this.inventoryPage = Math.max(0, Math.floor(page ?? (filterChanged ? 0 : this.inventoryPage)));
     this.clearUi();
     const graphics = this.getGraphics();
     this.drawStageBackground(graphics);
@@ -906,7 +907,7 @@ export class MvpGameController extends Component {
         isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
         isActive ? new Color(66, 116, 72, 255) : new Color(98, 83, 64, 255),
         () => {
-          this.showInventoryManagement(tab.filter, 0);
+          this.showInventoryManagement(tab.filter);
         },
         18
       );
@@ -955,45 +956,45 @@ export class MvpGameController extends Component {
       return;
     }
 
-    const pageCount = Math.max(1, Math.ceil(allProducts.length / INVENTORY_PRODUCTS_PER_PAGE));
-    this.inventoryPage = Math.min(this.inventoryPage, pageCount - 1);
-    const startIndex = this.inventoryPage * INVENTORY_PRODUCTS_PER_PAGE;
-    const products = allProducts.slice(startIndex, startIndex + INVENTORY_PRODUCTS_PER_PAGE);
-
-    if (products.length === 0) {
+    if (allProducts.length === 0) {
       this.createTextNode(this.node, 'InventoryEmptyHint', this.getText('emptyInventoryHint'), 0, 92, 28, new Color(78, 70, 58, 255), 520);
       return;
     }
 
-    products.forEach((product, index) => {
-      const position = positions[index];
-      this.createInventoryProductCard(product, position.x, position.y);
-    });
-
-    this.createInventoryPaginationControls(pageCount, allProducts.length);
+    this.createWarehouseScrollGrid(allProducts);
   }
 
-  private createInventoryPaginationControls(pageCount: number, totalCount: number): void {
-    this.createTextNode(
-      this.node,
-      'InventoryPageInfo',
-      `${this.getText('inventoryPageLabel')}: ${this.inventoryPage + 1}/${pageCount}    ${this.getText('inventoryTotalLabel')}: ${totalCount}`,
-      0,
-      -312,
-      19,
-      new Color(66, 58, 48, 230),
-      480
-    );
+  private createWarehouseScrollGrid(products: FinishedProductData[]): void {
+    const scrollNode = new Node('WarehouseScrollView');
+    this.node.addChild(scrollNode);
+    scrollNode.layer = this.node.layer;
+    scrollNode.setPosition(new Vec3(0, -82, 2));
+    scrollNode.addComponent(UITransform).setContentSize(WAREHOUSE_VIEW_WIDTH, WAREHOUSE_VIEW_HEIGHT);
+    scrollNode.addComponent(Mask);
+    const scrollView = scrollNode.addComponent(ScrollView);
+    scrollView.horizontal = false;
+    scrollView.vertical = true;
+    scrollView.inertia = true;
 
-    const previousButton = this.createButton(this.node, 'InventoryPrevPageButton', this.getText('previousPageButton'), -150, -360, 130, 42, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
-      this.showInventoryManagement(this.inventoryFilter, Math.max(0, this.inventoryPage - 1));
-    }, 17);
-    previousButton.active = this.inventoryPage > 0;
+    const content = new Node('WarehouseScrollContent');
+    scrollNode.addChild(content);
+    content.layer = this.node.layer;
+    const rowCount = Math.ceil(products.length / WAREHOUSE_COLUMNS);
+    const contentHeight = Math.max(WAREHOUSE_VIEW_HEIGHT, rowCount * WAREHOUSE_ROW_GAP + 34);
+    const contentTransform = content.addComponent(UITransform);
+    contentTransform.setAnchorPoint(0.5, 1);
+    contentTransform.setContentSize(WAREHOUSE_VIEW_WIDTH, contentHeight);
+    content.setPosition(new Vec3(0, WAREHOUSE_VIEW_HEIGHT * 0.5, 1));
+    scrollView.content = content;
 
-    const nextButton = this.createButton(this.node, 'InventoryNextPageButton', this.getText('nextPageButton'), 150, -360, 130, 42, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
-      this.showInventoryManagement(this.inventoryFilter, Math.min(pageCount - 1, this.inventoryPage + 1));
-    }, 17);
-    nextButton.active = this.inventoryPage < pageCount - 1;
+    const columnX = [-218, 0, 218];
+    products.forEach((product, index) => {
+      const column = index % WAREHOUSE_COLUMNS;
+      const row = Math.floor(index / WAREHOUSE_COLUMNS);
+      const x = columnX[column];
+      const y = -72 - row * WAREHOUSE_ROW_GAP;
+      this.createWarehouseProductCard(content, product, x, y);
+    });
   }
 
   private createInventoryProductCard(product: FinishedProductData, x: number, y: number): void {
@@ -1034,6 +1035,42 @@ export class MvpGameController extends Component {
         this.unlistProduct(product.id);
       }, 16);
     }
+  }
+
+  private createWarehouseProductCard(parent: Node, product: FinishedProductData, x: number, y: number): void {
+    const card = new Node(`WarehouseProductCard_${product.id}`);
+    parent.addChild(card);
+    card.layer = parent.layer;
+    card.setPosition(new Vec3(x, y, 2));
+    card.addComponent(UITransform).setContentSize(WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT);
+    const graphics = card.addComponent(Graphics);
+    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
+    this.drawPanel(graphics, WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT, new Color(255, 252, 238, 248), borderColor);
+    this.drawWarehousePreviewIcon(graphics, product);
+
+    this.createTextNode(card, `WarehouseProductName_${product.id}`, product.displayName, 0, 50, 17, new Color(44, 48, 42, 255), 160);
+    this.createTextNode(card, `WarehouseProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 20, 15, new Color(88, 72, 52, 255), 160);
+    this.createTextNode(card, `WarehouseProductStatus_${product.id}`, this.getProductStatusText(product.status), 26, -8, 15, this.getProductStatusColor(product.status), 104);
+
+    if (product.status === 'in_inventory') {
+      this.createButton(card, `WarehouseListProduct_${product.id}`, this.getText('listProductButton'), 0, -50, 96, 30, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+        this.listProduct(product.id);
+      }, 15);
+    } else if (product.status === 'on_shelf') {
+      this.createButton(card, `WarehouseUnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -50, 96, 30, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+        this.unlistProduct(product.id);
+      }, 15);
+    }
+  }
+
+  private drawWarehousePreviewIcon(graphics: Graphics, product: FinishedProductData): void {
+    const color = this.getProductIconColor(product.colorSummary);
+    graphics.fillColor = new Color(color.r, color.g, color.b, product.status === 'sold' ? 120 : 210);
+    graphics.strokeColor = new Color(45, 76, 62, 190);
+    graphics.lineWidth = 2;
+    graphics.circle(-68, -8, 12);
+    graphics.fill();
+    graphics.stroke();
   }
 
   private drawInventoryPreviewIcon(graphics: Graphics, product: FinishedProductData): void {
@@ -1094,7 +1131,7 @@ export class MvpGameController extends Component {
     product.isSold = false;
     this.statusMessage = this.getText('productListedMessage');
     const nextFilter = this.inventoryFilter === 'in_inventory' ? 'all' : this.inventoryFilter;
-    this.showInventoryManagement(nextFilter, this.inventoryPage);
+    this.showInventoryManagement(nextFilter);
   }
 
   private unlistProduct(productId: string): void {
@@ -1108,7 +1145,7 @@ export class MvpGameController extends Component {
     product.soldDay = null;
     this.statusMessage = this.getText('productUnlistedMessage');
     const nextFilter = this.inventoryFilter === 'on_shelf' ? 'all' : this.inventoryFilter;
-    this.showInventoryManagement(nextFilter, this.inventoryPage);
+    this.showInventoryManagement(nextFilter);
   }
 
   private refreshMarket(): void {
