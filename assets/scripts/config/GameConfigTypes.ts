@@ -244,6 +244,24 @@ export interface TextConfig {
   texts: Record<string, string>;
 }
 
+export interface CustomerTypeConfig {
+  id: string;
+  displayName: string;
+  probability: number;
+  budgetRange: [number, number];
+  preferredStyleIds: string[];
+  preferredColorIds: string[];
+  priceSensitivity: number;
+  qualitySensitivity: number;
+  crackTolerance: number;
+  buyProbabilityBase: number;
+  messageKey: string;
+}
+
+export interface CustomerConfig {
+  customerTypes: CustomerTypeConfig[];
+}
+
 export interface LoadedGameConfigs {
   demoLevel: DemoLevelConfig;
   jade: JadeConfig;
@@ -251,5 +269,6 @@ export interface LoadedGameConfigs {
   crack: CrackConfig;
   carving: CarvingConfig;
   settlement: SettlementConfig;
+  customer: CustomerConfig;
   text: TextConfig;
 }

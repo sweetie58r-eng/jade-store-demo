@@ -1,0 +1,69 @@
+{
+  "customerTypes": [
+    {
+      "id": "budget_buyer",
+      "displayName": "精打细算的客人",
+      "probability": 0.35,
+      "budgetRange": [50, 800],
+      "preferredStyleIds": ["small_bead", "cabochon", "peace_buckle"],
+      "preferredColorIds": [],
+      "priceSensitivity": 1.5,
+      "qualitySensitivity": 0.6,
+      "crackTolerance": 0.8,
+      "buyProbabilityBase": 1.0,
+      "messageKey": "budgetBuyerPurchaseMessage"
+    },
+    {
+      "id": "gift_buyer",
+      "displayName": "送礼的客人",
+      "probability": 0.22,
+      "budgetRange": [300, 2500],
+      "preferredStyleIds": ["peace_buckle", "jade_plaque", "buddha_guanyin"],
+      "preferredColorIds": ["white", "light_green", "green", "purple"],
+      "priceSensitivity": 1.0,
+      "qualitySensitivity": 1.0,
+      "crackTolerance": 0.6,
+      "buyProbabilityBase": 1.0,
+      "messageKey": "giftBuyerPurchaseMessage"
+    },
+    {
+      "id": "collector",
+      "displayName": "收藏客",
+      "probability": 0.12,
+      "budgetRange": [1200, 12000],
+      "preferredStyleIds": ["landscape_ornament", "pixiu", "jade_plaque", "jade_bangle"],
+      "preferredColorIds": ["deep_green", "vivid_green", "purple", "red", "mixed"],
+      "priceSensitivity": 0.5,
+      "qualitySensitivity": 1.8,
+      "crackTolerance": 0.35,
+      "buyProbabilityBase": 1.0,
+      "messageKey": "collectorPurchaseMessage"
+    },
+    {
+      "id": "color_hunter",
+      "displayName": "追色的客人",
+      "probability": 0.16,
+      "budgetRange": [500, 8000],
+      "preferredStyleIds": [],
+      "preferredColorIds": ["green", "vivid_green", "deep_green", "purple", "red", "mixed"],
+      "priceSensitivity": 0.8,
+      "qualitySensitivity": 1.3,
+      "crackTolerance": 0.5,
+      "buyProbabilityBase": 1.0,
+      "messageKey": "colorHunterPurchaseMessage"
+    },
+    {
+      "id": "casual_visitor",
+      "displayName": "随便看看的客人",
+      "probability": 0.15,
+      "budgetRange": [80, 1500],
+      "preferredStyleIds": [],
+      "preferredColorIds": [],
+      "priceSensitivity": 1.1,
+      "qualitySensitivity": 0.8,
+      "crackTolerance": 0.9,
+      "buyProbabilityBase": 1.0,
+      "messageKey": "casualVisitorPurchaseMessage"
+    }
+  ]
+}

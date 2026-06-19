@@ -4,6 +4,7 @@ import {
   CarvingConfig,
   ColorConfig,
   CrackConfig,
+  CustomerConfig,
   DemoLevelConfig,
   JadeConfig,
   LoadedGameConfigs,
@@ -17,13 +18,14 @@ export class ConfigLoader {
   }
 
   public static async loadGameConfigs(): Promise<LoadedGameConfigs> {
-    const [demoLevel, jade, color, crack, carving, settlement, text] = await Promise.all([
+    const [demoLevel, jade, color, crack, carving, settlement, customer, text] = await Promise.all([
       this.loadJson<DemoLevelConfig>('config/demo_level_config'),
       this.loadJson<JadeConfig>('config/jade_config'),
       this.loadJson<ColorConfig>('config/color_config'),
       this.loadJson<CrackConfig>('config/crack_config'),
       this.loadJson<CarvingConfig>('config/carving_config'),
       this.loadJson<SettlementConfig>('config/settlement_config'),
+      this.loadJson<CustomerConfig>('config/customer_config'),
       this.loadJson<TextConfig>('config/text_config')
     ]);
 
@@ -34,6 +36,7 @@ export class ConfigLoader {
       crack,
       carving,
       settlement,
+      customer,
       text
     };
   }

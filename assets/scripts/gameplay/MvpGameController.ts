@@ -1,6 +1,6 @@
 import { Color, Component, EventTouch, Graphics, Label, Mask, Node, ScrollView, UITransform, Vec3, _decorator } from 'cc';
 
-import { LoadedGameConfigs } from '../config/GameConfigTypes';
+import { CustomerTypeConfig, LoadedGameConfigs } from '../config/GameConfigTypes';
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
 import { JadeGenerator } from '../core/generator/JadeGenerator';
 import { SeededRandom } from '../core/random/SeededRandom';
@@ -32,6 +32,9 @@ const WAREHOUSE_VIEW_HEIGHT = 660;
 
 interface SalesEventData {
   customerIndex: number;
+  customerTypeId: string;
+  customerDisplayName: string;
+  customerMessageKey: string;
   productId: string | null;
   purchased: boolean;
 }
@@ -431,6 +434,7 @@ export class MvpGameController extends Component {
       };
     }
 
+    const random = new SeededRandom(this.configs.demoLevel.seed + this.day * 7919 + this.finishedProducts.length * 13);
     const events: SalesEventData[] = [];
     const plannedSoldIds = new Set<string>();
     const customerCount = this.configs.demoLevel.economy.dailyCustomerCount;
@@ -440,16 +444,20 @@ export class MvpGameController extends Component {
       .map((product) => product.id);
 
     for (let customerIndex = 0; customerIndex < customerCount; customerIndex += 1) {
+      const customerType = this.pickCustomerType(random);
       const availableProducts = this.finishedProducts.filter((product) => shelfProductIds.includes(product.id) && product.status === 'on_shelf' && !plannedSoldIds.has(product.id));
       if (availableProducts.length === 0) {
         break;
       }
 
-      const product = availableProducts[0];
+      const product = this.pickProductForCustomerPreferences(availableProducts, customerType, random);
       plannedSoldIds.add(product.id);
 
       events.push({
         customerIndex,
+        customerTypeId: customerType.id,
+        customerDisplayName: customerType.displayName,
+        customerMessageKey: customerType.messageKey,
         productId: product.id,
         purchased: true
       });
@@ -753,6 +761,85 @@ export class MvpGameController extends Component {
     return products[products.length - 1];
   }
 
+  private pickCustomerType(random: SeededRandom): CustomerTypeConfig {
+    const customerTypes = this.configs?.customer.customerTypes ?? [];
+    if (customerTypes.length === 0) {
+      return {
+        id: 'casual_visitor',
+        displayName: this.getText('defaultCustomerDisplayName'),
+        probability: 1,
+        budgetRange: [0, Number.MAX_SAFE_INTEGER],
+        preferredStyleIds: [],
+        preferredColorIds: [],
+        priceSensitivity: 1,
+        qualitySensitivity: 1,
+        crackTolerance: 1,
+        buyProbabilityBase: 1,
+        messageKey: 'casualVisitorPurchaseMessage'
+      };
+    }
+
+    return random.pickWeighted(customerTypes);
+  }
+
+  private pickProductForCustomerPreferences(products: FinishedProductData[], customer: CustomerTypeConfig, random: SeededRandom): FinishedProductData {
+    let bestProduct = products[0];
+    let bestScore = Number.NEGATIVE_INFINITY;
+
+    for (const product of products) {
+      const score = this.calculateCustomerProductScore(product, customer, random);
+      if (score > bestScore) {
+        bestScore = score;
+        bestProduct = product;
+      }
+    }
+
+    return bestProduct;
+  }
+
+  private calculateCustomerProductScore(product: FinishedProductData, customer: CustomerTypeConfig, random: SeededRandom): number {
+    const [budgetMin, budgetMax] = customer.budgetRange;
+    const price = Math.max(1, product.listedPrice);
+    const materialScore = this.getMaterialQualityScore(product.materialQualityId);
+    const styleMatchBonus = customer.preferredStyleIds.includes(product.styleId) ? 3.2 : 0;
+    const colorMatchBonus = customer.preferredColorIds.includes(product.colorSummary) ? 3.4 : 0;
+    const qualityScore = materialScore * customer.qualitySensitivity * 2.2;
+    const priceFitScore = this.calculatePriceFitScore(price, budgetMin, budgetMax, customer.priceSensitivity);
+    const crackPenaltyScore = (product.crackPenalty / 100) * (1.5 - customer.crackTolerance) * 3.6;
+    const valueScore = clamp(product.finalSellPrice / 1800, 0, 4) * (1.2 - customer.priceSensitivity * 0.18);
+    const randomNoise = random.range(-0.35, 0.35);
+
+    return 1 + styleMatchBonus + colorMatchBonus + qualityScore + priceFitScore + valueScore - crackPenaltyScore + randomNoise;
+  }
+
+  private calculatePriceFitScore(price: number, budgetMin: number, budgetMax: number, priceSensitivity: number): number {
+    if (price >= budgetMin && price <= budgetMax) {
+      const center = (budgetMin + budgetMax) * 0.5;
+      const halfRange = Math.max(1, (budgetMax - budgetMin) * 0.5);
+      const centeredFit = 1 - clamp(Math.abs(price - center) / halfRange, 0, 1);
+      return 1.2 + centeredFit * 1.4;
+    }
+
+    if (price < budgetMin) {
+      return clamp(price / Math.max(1, budgetMin), 0.25, 1) * 0.8;
+    }
+
+    const overBudgetRatio = (price - budgetMax) / Math.max(1, budgetMax);
+    return -Math.min(4.5, overBudgetRatio * 2.2 * priceSensitivity);
+  }
+
+  private getMaterialQualityScore(materialQualityId: string): number {
+    const qualityScores: Record<string, number> = {
+      stone: 0.2,
+      common: 0.55,
+      fine: 1.0,
+      icy: 1.55,
+      glass: 2.2
+    };
+
+    return qualityScores[materialQualityId] ?? 0.6;
+  }
+
   private scheduleNextSalesEvent(): void {
     const token = this.salesSequenceToken + 1;
     this.salesSequenceToken = token;
@@ -826,12 +913,15 @@ export class MvpGameController extends Component {
       session.income += product.finalSellPrice;
       session.soldProductIds.push(product.id);
       this.coins += product.finalSellPrice;
-      session.message = this.getText('customerBoughtMessage')
-        .replace('{index}', `${customerNumber}`)
+      const purchaseTemplate = this.getText(event.customerMessageKey);
+      session.message = purchaseTemplate
+        .replace('{customer}', event.customerDisplayName)
         .replace('{name}', product.displayName)
         .replace('{price}', `${product.finalSellPrice}`);
     } else {
-      session.message = this.getText('customerLeftMessage').replace('{index}', `${customerNumber}`);
+      session.message = this.getText('customerLeftMessage')
+        .replace('{index}', `${customerNumber}`)
+        .replace('{customer}', event.customerDisplayName);
     }
 
     this.syncSalesResultFromSession();
