@@ -23,6 +23,7 @@ const DEFAULT_SHELF_SLOT_COUNT = 6;
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
+const INVENTORY_PRODUCTS_PER_PAGE = 6;
 
 interface SalesEventData {
   customerIndex: number;
@@ -64,6 +65,7 @@ export class MvpGameController extends Component {
   private processingSequenceToken = 0;
   private productCardStatus = new Map<string, string>();
   private inventoryFilter: InventoryFilter = 'all';
+  private inventoryPage = 0;
   private newlyCompletedProductCount = 0;
   private jobCounter = 0;
   private productCounter = 0;
@@ -90,6 +92,7 @@ export class MvpGameController extends Component {
     this.salesSequenceToken = 0;
     this.processingSequenceToken = 0;
     this.inventoryFilter = 'all';
+    this.inventoryPage = 0;
     this.newlyCompletedProductCount = 0;
     this.productCardStatus.clear();
     this.statusMessage = this.getText('marketRefreshedMessage');
@@ -123,7 +126,7 @@ export class MvpGameController extends Component {
     this.createProductSummary();
     this.createCommercialPlaceholderPanel();
     this.createButton(this.node, 'InventoryButton', this.getText('inventoryButton'), -246, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
-      this.showInventoryManagement('in_inventory');
+      this.showInventoryManagement('all', 0);
     }, 20);
     this.createButton(this.node, 'StallButton', this.getText('stallButton'), -82, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
       this.showInventoryManagement('on_shelf');
@@ -355,7 +358,7 @@ export class MvpGameController extends Component {
         : this.getText('marketRefreshedMessage');
 
     if (completedProductCount > 0) {
-      this.showInventoryManagement('in_inventory');
+      this.showInventoryManagement('all', 0);
     } else {
       this.showMarket();
     }
@@ -398,7 +401,7 @@ export class MvpGameController extends Component {
   private startDailySales(): void {
     if (this.countProductsByStatus('on_shelf') < 1) {
       this.statusMessage = this.getText('noShelfProductsMessage');
-      this.showInventoryManagement('in_inventory');
+      this.showInventoryManagement('all', this.inventoryPage);
       return;
     }
 
@@ -864,9 +867,11 @@ export class MvpGameController extends Component {
     };
   }
 
-  private showInventoryManagement(filter: InventoryFilter): void {
+  private showInventoryManagement(filter: InventoryFilter, page?: number): void {
     this.shutdownWorkLayers();
+    const filterChanged = this.inventoryFilter !== filter;
     this.inventoryFilter = filter;
+    this.inventoryPage = Math.max(0, Math.floor(page ?? (filterChanged ? 0 : this.inventoryPage)));
     this.clearUi();
     const graphics = this.getGraphics();
     this.drawStageBackground(graphics);
@@ -901,7 +906,7 @@ export class MvpGameController extends Component {
         isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
         isActive ? new Color(66, 116, 72, 255) : new Color(98, 83, 64, 255),
         () => {
-          this.showInventoryManagement(tab.filter);
+          this.showInventoryManagement(tab.filter, 0);
         },
         18
       );
@@ -926,7 +931,7 @@ export class MvpGameController extends Component {
   }
 
   private createInventoryProductCards(filter: InventoryFilter): void {
-    const products = this.getFilteredProducts(filter).slice(0, 6);
+    const allProducts = this.getFilteredProducts(filter);
     const positions = [
       { x: -205, y: 175 },
       { x: 0, y: 175 },
@@ -940,7 +945,7 @@ export class MvpGameController extends Component {
       const shelfSlotCount = Math.min(this.getShelfSlotCount(), positions.length);
       for (let index = 0; index < shelfSlotCount; index += 1) {
         const position = positions[index];
-        const product = products[index];
+        const product = allProducts[index];
         if (product) {
           this.createInventoryProductCard(product, position.x, position.y);
         } else {
@@ -949,6 +954,11 @@ export class MvpGameController extends Component {
       }
       return;
     }
+
+    const pageCount = Math.max(1, Math.ceil(allProducts.length / INVENTORY_PRODUCTS_PER_PAGE));
+    this.inventoryPage = Math.min(this.inventoryPage, pageCount - 1);
+    const startIndex = this.inventoryPage * INVENTORY_PRODUCTS_PER_PAGE;
+    const products = allProducts.slice(startIndex, startIndex + INVENTORY_PRODUCTS_PER_PAGE);
 
     if (products.length === 0) {
       this.createTextNode(this.node, 'InventoryEmptyHint', this.getText('emptyInventoryHint'), 0, 92, 28, new Color(78, 70, 58, 255), 520);
@@ -959,6 +969,31 @@ export class MvpGameController extends Component {
       const position = positions[index];
       this.createInventoryProductCard(product, position.x, position.y);
     });
+
+    this.createInventoryPaginationControls(pageCount, allProducts.length);
+  }
+
+  private createInventoryPaginationControls(pageCount: number, totalCount: number): void {
+    this.createTextNode(
+      this.node,
+      'InventoryPageInfo',
+      `${this.getText('inventoryPageLabel')}: ${this.inventoryPage + 1}/${pageCount}    ${this.getText('inventoryTotalLabel')}: ${totalCount}`,
+      0,
+      -312,
+      19,
+      new Color(66, 58, 48, 230),
+      480
+    );
+
+    const previousButton = this.createButton(this.node, 'InventoryPrevPageButton', this.getText('previousPageButton'), -150, -360, 130, 42, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
+      this.showInventoryManagement(this.inventoryFilter, Math.max(0, this.inventoryPage - 1));
+    }, 17);
+    previousButton.active = this.inventoryPage > 0;
+
+    const nextButton = this.createButton(this.node, 'InventoryNextPageButton', this.getText('nextPageButton'), 150, -360, 130, 42, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
+      this.showInventoryManagement(this.inventoryFilter, Math.min(pageCount - 1, this.inventoryPage + 1));
+    }, 17);
+    nextButton.active = this.inventoryPage < pageCount - 1;
   }
 
   private createInventoryProductCard(product: FinishedProductData, x: number, y: number): void {
@@ -1058,7 +1093,8 @@ export class MvpGameController extends Component {
     product.status = 'on_shelf';
     product.isSold = false;
     this.statusMessage = this.getText('productListedMessage');
-    this.showInventoryManagement('on_shelf');
+    const nextFilter = this.inventoryFilter === 'in_inventory' ? 'all' : this.inventoryFilter;
+    this.showInventoryManagement(nextFilter, this.inventoryPage);
   }
 
   private unlistProduct(productId: string): void {
@@ -1071,7 +1107,8 @@ export class MvpGameController extends Component {
     product.isSold = false;
     product.soldDay = null;
     this.statusMessage = this.getText('productUnlistedMessage');
-    this.showInventoryManagement('in_inventory');
+    const nextFilter = this.inventoryFilter === 'on_shelf' ? 'all' : this.inventoryFilter;
+    this.showInventoryManagement(nextFilter, this.inventoryPage);
   }
 
   private refreshMarket(): void {
