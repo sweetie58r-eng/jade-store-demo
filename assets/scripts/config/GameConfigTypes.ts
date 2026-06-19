@@ -33,6 +33,7 @@ export interface DemoLevelConfig {
   economy: {
     initialCoins: number;
     marketStoneCountRange: [number, number];
+    initialShelfSlotCount: number;
     dailyCustomerCount: number;
     finalSellPriceMultiplierRange: [number, number];
     lowPriceSellBias: number;

@@ -28,6 +28,7 @@
   "economy": {
     "initialCoins": 6000,
     "marketStoneCountRange": [4, 6],
+    "initialShelfSlotCount": 6,
     "dailyCustomerCount": 5,
     "finalSellPriceMultiplierRange": [0.85, 1.2],
     "lowPriceSellBias": 1.35,

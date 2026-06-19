@@ -148,10 +148,22 @@ M5 starts from a simplified local business loop instead of opening one stone dir
 - Finish reveal to enter the M3 carving layout.
 - Add at least one valid carving, then click the `sendProcessingButton` UI text (`送去加工`).
 - The stone enters a local processing queue and finishes on the next day.
-- Click the next-day button to advance one day, complete processing jobs, generate finished products, run one simple stall-sale pass, and show the stall sales result screen.
+- Click the next-day button to advance one day, complete processing jobs, and generate finished products.
+- From M6.2 onward, finished products enter inventory first. Open inventory or stall management, list products manually, then start stall sales.
 - Click the continue-purchase button on the sales result screen to return to the refreshed raw-stone market.
 - Sold products add coins, so the player can buy another stone and repeat the loop.
 - M5 includes placeholder entries for future rewarded ads and IAP in config only. These buttons show placeholder text and do not call any real ad, payment, login, leaderboard, or backend service.
+
+## M6.2 Inventory And Shelf Flow
+
+- Finished products default to `in_inventory` after processing completes.
+- Click the inventory button to open inventory management.
+- Inventory tabs show all products, inventory-only products, listed products, and sold records.
+- Click a product's list button to move it from `in_inventory` to `on_shelf`.
+- Click a listed product's unlist button to move it back to `in_inventory`.
+- The stall capacity comes from `demo_level_config.json` -> `economy.initialShelfSlotCount`.
+- Click start sales only after at least one product is `on_shelf`.
+- Daily sales only selects `on_shelf` products. `in_inventory` and `sold` products are not purchasable.
 
 ## Preview Logs
 

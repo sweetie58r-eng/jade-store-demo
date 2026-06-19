@@ -22,6 +22,7 @@ const PROCESSING_ANIMATION_SECONDS = 1.35;
 const DEFAULT_SHELF_SLOT_COUNT = 6;
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
+type InventoryFilter = 'all' | ProductStatus;
 
 interface SalesEventData {
   customerIndex: number;
@@ -62,6 +63,8 @@ export class MvpGameController extends Component {
   private salesSequenceToken = 0;
   private processingSequenceToken = 0;
   private productCardStatus = new Map<string, string>();
+  private inventoryFilter: InventoryFilter = 'all';
+  private newlyCompletedProductCount = 0;
   private jobCounter = 0;
   private productCounter = 0;
 
@@ -86,6 +89,8 @@ export class MvpGameController extends Component {
     this.activeSalesSession = null;
     this.salesSequenceToken = 0;
     this.processingSequenceToken = 0;
+    this.inventoryFilter = 'all';
+    this.newlyCompletedProductCount = 0;
     this.productCardStatus.clear();
     this.statusMessage = this.getText('marketRefreshedMessage');
     this.ensureUiRoot();
@@ -117,9 +122,18 @@ export class MvpGameController extends Component {
     this.createStatusPanel();
     this.createProductSummary();
     this.createCommercialPlaceholderPanel();
-    this.createButton(this.node, 'NextDayButton', this.getText('nextDayButton'), 0, -590, 260, 58, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+    this.createButton(this.node, 'InventoryButton', this.getText('inventoryButton'), -246, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
+      this.showInventoryManagement('in_inventory');
+    }, 20);
+    this.createButton(this.node, 'StallButton', this.getText('stallButton'), -82, -590, 132, 54, new Color(248, 241, 221, 245), new Color(98, 83, 64, 255), () => {
+      this.showInventoryManagement('on_shelf');
+    }, 20);
+    this.createButton(this.node, 'StartSalesButton', this.getText('startSalesButton'), 82, -590, 132, 54, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+      this.startDailySales();
+    }, 20);
+    this.createButton(this.node, 'NextDayButton', this.getText('nextDayButton'), 246, -590, 132, 54, new Color(232, 241, 252, 255), new Color(74, 110, 132, 255), () => {
       this.advanceDay();
-    });
+    }, 20);
     this.updateDebugInfo();
     this.arrangeLayers?.();
   }
@@ -333,13 +347,18 @@ export class MvpGameController extends Component {
     for (const job of completedJobs) {
       completedProductCount += this.finishProcessingJob(job);
     }
-    this.autoShelfInventoryProducts();
-
-    this.activeSalesSession = this.prepareDailySales(completedProductCount);
-    this.syncSalesResultFromSession();
+    this.newlyCompletedProductCount += completedProductCount;
     this.refreshMarket();
-    this.statusMessage = this.getText('marketRefreshedMessage');
-    this.showSalesProcess(true);
+    this.statusMessage =
+      completedProductCount > 0
+        ? this.getText('productsEnteredInventoryMessage')
+        : this.getText('marketRefreshedMessage');
+
+    if (completedProductCount > 0) {
+      this.showInventoryManagement('in_inventory');
+    } else {
+      this.showMarket();
+    }
   }
 
   private finishProcessingJob(job: ProcessingJobData): number {
@@ -376,20 +395,17 @@ export class MvpGameController extends Component {
     return completedCount;
   }
 
-  private autoShelfInventoryProducts(): void {
-    const openSlots = Math.max(0, DEFAULT_SHELF_SLOT_COUNT - this.countProductsByStatus('on_shelf'));
-    if (openSlots === 0) {
+  private startDailySales(): void {
+    if (this.countProductsByStatus('on_shelf') < 1) {
+      this.statusMessage = this.getText('noShelfProductsMessage');
+      this.showInventoryManagement('in_inventory');
       return;
     }
 
-    const productsToShelf = this.finishedProducts
-      .filter((product) => product.status === 'in_inventory')
-      .slice(0, openSlots);
-
-    for (const product of productsToShelf) {
-      product.status = 'on_shelf';
-      product.isSold = false;
-    }
+    this.activeSalesSession = this.prepareDailySales(this.newlyCompletedProductCount);
+    this.newlyCompletedProductCount = 0;
+    this.syncSalesResultFromSession();
+    this.showSalesProcess(true);
   }
 
   private prepareDailySales(completedProductCount: number): SalesSessionData {
@@ -415,7 +431,7 @@ export class MvpGameController extends Component {
     const customerCount = this.configs.demoLevel.economy.dailyCustomerCount;
     const shelfProductIds = this.finishedProducts
       .filter((product) => product.status === 'on_shelf')
-      .slice(0, DEFAULT_SHELF_SLOT_COUNT)
+      .slice(0, this.getShelfSlotCount())
       .map((product) => product.id);
 
     for (let customerIndex = 0; customerIndex < customerCount; customerIndex += 1) {
@@ -579,7 +595,7 @@ export class MvpGameController extends Component {
     const soldIds = new Set(this.lastSalesResult.soldProducts.map((product) => product.id));
     const shelfIds = this.activeSalesSession?.shelfProductIds ?? this.finishedProducts
       .filter((product) => product.status === 'on_shelf')
-      .slice(0, DEFAULT_SHELF_SLOT_COUNT)
+      .slice(0, this.getShelfSlotCount())
       .map((product) => product.id);
     const products = shelfIds
       .map((productId) => this.finishedProducts.find((product) => product.id === productId) ?? null)
@@ -843,9 +859,180 @@ export class MvpGameController extends Component {
       income: session.income,
       customerCount: session.customerCount,
       completedProductCount: session.completedProductCount,
-      unsoldCount: this.finishedProducts.filter((product) => product.status !== 'sold').length,
+      unsoldCount: session.shelfProductIds.filter((productId) => !soldIdSet.has(productId)).length,
       soldProducts: this.finishedProducts.filter((product) => soldIdSet.has(product.id))
     };
+  }
+
+  private showInventoryManagement(filter: InventoryFilter): void {
+    this.shutdownWorkLayers();
+    this.inventoryFilter = filter;
+    this.clearUi();
+    const graphics = this.getGraphics();
+    this.drawStageBackground(graphics);
+    const title = filter === 'on_shelf' ? this.getText('stallManageTitle') : this.getText('inventoryManageTitle');
+    this.createHud(this.node, title);
+    this.createInventoryTabs();
+    this.createShelfInfoPanel();
+    this.createInventoryProductCards(filter);
+    this.createInventoryActions();
+    this.updateDebugInfo();
+    this.arrangeLayers?.();
+  }
+
+  private createInventoryTabs(): void {
+    const tabs: { filter: InventoryFilter; labelKey: string; x: number }[] = [
+      { filter: 'all', labelKey: 'allProductsTab', x: -240 },
+      { filter: 'in_inventory', labelKey: 'inventoryProductsTab', x: -80 },
+      { filter: 'on_shelf', labelKey: 'shelfProductsTab', x: 80 },
+      { filter: 'sold', labelKey: 'soldProductsTab', x: 240 }
+    ];
+
+    for (const tab of tabs) {
+      const isActive = this.inventoryFilter === tab.filter;
+      this.createButton(
+        this.node,
+        `InventoryTab_${tab.filter}`,
+        this.getText(tab.labelKey),
+        tab.x,
+        462,
+        140,
+        48,
+        isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
+        isActive ? new Color(66, 116, 72, 255) : new Color(98, 83, 64, 255),
+        () => {
+          this.showInventoryManagement(tab.filter);
+        },
+        18
+      );
+    }
+  }
+
+  private createShelfInfoPanel(): void {
+    const shelfCount = this.countProductsByStatus('on_shelf');
+    const shelfSlotCount = this.getShelfSlotCount();
+    this.drawPanel(this.getGraphicsForNode(this.node, 'InventoryInfoPanel'), 620, 70, new Color(255, 247, 218, 230), new Color(90, 75, 55, 255), { x: 0, y: 398 });
+    this.createTextNode(
+      this.node,
+      'InventoryInfoText',
+      `${this.getText('shelfSlotLabel')}: ${shelfCount}/${shelfSlotCount}    ${this.getText('productStorageTitle')}: ${this.getActiveProductCount()}`,
+      0,
+      388,
+      22,
+      new Color(48, 58, 48, 255),
+      580
+    );
+    this.createTextNode(this.node, 'InventoryStatusMessage', this.statusMessage, 0, 354, 19, new Color(80, 64, 48, 230), 580);
+  }
+
+  private createInventoryProductCards(filter: InventoryFilter): void {
+    const products = this.getFilteredProducts(filter).slice(0, 6);
+    const positions = [
+      { x: -205, y: 224 },
+      { x: 0, y: 224 },
+      { x: 205, y: 224 },
+      { x: -205, y: -8 },
+      { x: 0, y: -8 },
+      { x: 205, y: -8 }
+    ];
+
+    if (products.length === 0) {
+      this.createTextNode(this.node, 'InventoryEmptyHint', this.getText('emptyInventoryHint'), 0, 92, 28, new Color(78, 70, 58, 255), 520);
+      return;
+    }
+
+    products.forEach((product, index) => {
+      const position = positions[index];
+      this.createInventoryProductCard(product, position.x, position.y);
+    });
+  }
+
+  private createInventoryProductCard(product: FinishedProductData, x: number, y: number): void {
+    const card = new Node(`InventoryProductCard_${product.id}`);
+    this.node.addChild(card);
+    card.layer = this.node.layer;
+    card.setPosition(new Vec3(x, y, 2));
+    card.addComponent(UITransform).setContentSize(188, 216);
+    const graphics = card.addComponent(Graphics);
+    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
+    this.drawPanel(graphics, 188, 216, new Color(255, 252, 238, 250), borderColor);
+    this.drawProductIcon(graphics, product, product.status === 'sold');
+
+    this.createTextNode(card, `InventoryProductName_${product.id}`, product.displayName, 0, 72, 18, new Color(44, 48, 42, 255), 160);
+    this.createTextNode(card, `InventoryProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 42, 17, new Color(88, 72, 52, 255), 160);
+    this.createTextNode(card, `InventoryProductStatus_${product.id}`, this.getProductStatusText(product.status), 0, 12, 17, this.getProductStatusColor(product.status), 160);
+    this.createTextNode(
+      card,
+      `InventoryProductMeta_${product.id}`,
+      `${this.getMaterialQualityDisplayName(product.materialQualityId)} / ${this.getColorSummaryDisplayName(product.colorSummary)}`,
+      0,
+      -18,
+      14,
+      new Color(78, 70, 58, 230),
+      160
+    );
+
+    if (product.crackPenalty > 0) {
+      this.createButton(card, `InventoryCrackPenalty_${product.id}`, this.getText('crackPenaltyTag'), 42, -47, 78, 24, new Color(255, 229, 220, 255), new Color(174, 80, 62, 255), () => undefined, 13);
+    }
+
+    if (product.status === 'in_inventory') {
+      this.createButton(card, `ListProduct_${product.id}`, this.getText('listProductButton'), 0, -84, 108, 32, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+        this.listProduct(product.id);
+      }, 16);
+    } else if (product.status === 'on_shelf') {
+      this.createButton(card, `UnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -84, 108, 32, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+        this.unlistProduct(product.id);
+      }, 16);
+    }
+  }
+
+  private createInventoryActions(): void {
+    this.createButton(this.node, 'InventoryBackMarketButton', this.getText('backMarketButton'), -170, -548, 210, 60, new Color(248, 241, 221, 255), new Color(98, 83, 64, 255), () => {
+      this.showMarket();
+    }, 21);
+    this.createButton(this.node, 'InventoryStartSalesButton', this.getText('startSalesButton'), 170, -548, 210, 60, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+      this.startDailySales();
+    }, 21);
+  }
+
+  private getFilteredProducts(filter: InventoryFilter): FinishedProductData[] {
+    if (filter === 'all') {
+      return [...this.finishedProducts];
+    }
+
+    return this.finishedProducts.filter((product) => product.status === filter);
+  }
+
+  private listProduct(productId: string): void {
+    const product = this.finishedProducts.find((item) => item.id === productId);
+    if (!product || product.status !== 'in_inventory') {
+      return;
+    }
+
+    if (this.countProductsByStatus('on_shelf') >= this.getShelfSlotCount()) {
+      this.statusMessage = this.getText('shelfFullMessage');
+      this.showInventoryManagement(this.inventoryFilter);
+      return;
+    }
+
+    product.status = 'on_shelf';
+    product.isSold = false;
+    this.statusMessage = this.getText('productListedMessage');
+    this.showInventoryManagement('on_shelf');
+  }
+
+  private unlistProduct(productId: string): void {
+    const product = this.finishedProducts.find((item) => item.id === productId);
+    if (!product || product.status !== 'on_shelf') {
+      return;
+    }
+
+    product.status = 'in_inventory';
+    product.isSold = false;
+    product.soldDay = null;
+    this.statusMessage = this.getText('productUnlistedMessage');
+    this.showInventoryManagement('in_inventory');
   }
 
   private refreshMarket(): void {
@@ -1082,6 +1269,46 @@ export class MvpGameController extends Component {
 
   private countProductsByStatus(status: ProductStatus): number {
     return this.finishedProducts.filter((product) => product.status === status).length;
+  }
+
+  private getActiveProductCount(): number {
+    return this.finishedProducts.filter((product) => product.status !== 'sold').length;
+  }
+
+  private getShelfSlotCount(): number {
+    return this.configs?.demoLevel.economy.initialShelfSlotCount ?? DEFAULT_SHELF_SLOT_COUNT;
+  }
+
+  private getProductStatusText(status: ProductStatus): string {
+    if (status === 'in_inventory') {
+      return this.getText('inventoryStatusLabel');
+    }
+
+    if (status === 'on_shelf') {
+      return this.getText('onShelfStatusLabel');
+    }
+
+    return this.getText('soldStatusLabel');
+  }
+
+  private getProductStatusColor(status: ProductStatus): Color {
+    if (status === 'in_inventory') {
+      return new Color(88, 72, 52, 255);
+    }
+
+    if (status === 'on_shelf') {
+      return new Color(52, 138, 68, 255);
+    }
+
+    return new Color(112, 112, 112, 255);
+  }
+
+  private getMaterialQualityDisplayName(materialQualityId: string): string {
+    return this.configs?.demoLevel.economy.materialQualities.find((quality) => quality.id === materialQualityId)?.displayName ?? materialQualityId;
+  }
+
+  private getColorSummaryDisplayName(colorSummary: string): string {
+    return this.configs?.color.colors.find((color) => color.id === colorSummary)?.displayName ?? colorSummary;
   }
 
   private createCommercialPlaceholderPanel(): void {
