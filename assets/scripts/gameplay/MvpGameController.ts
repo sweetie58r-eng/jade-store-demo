@@ -29,6 +29,21 @@ const WAREHOUSE_CARD_HEIGHT = 146;
 const WAREHOUSE_ROW_GAP = 166;
 const WAREHOUSE_VIEW_WIDTH = 650;
 const WAREHOUSE_VIEW_HEIGHT = 660;
+const UI_COLORS = {
+  background: new Color(235, 220, 190, 255),
+  backgroundBand: new Color(218, 190, 148, 255),
+  card: new Color(255, 250, 232, 250),
+  cardWarm: new Color(248, 235, 204, 245),
+  wood: new Color(126, 84, 50, 255),
+  woodDark: new Color(88, 58, 36, 255),
+  woodLight: new Color(170, 115, 70, 255),
+  jade: new Color(76, 146, 90, 255),
+  jadeLight: new Color(220, 246, 224, 255),
+  jadeDark: new Color(45, 94, 58, 255),
+  gold: new Color(206, 158, 58, 255),
+  text: new Color(58, 45, 35, 255),
+  subText: new Color(90, 75, 55, 235)
+};
 
 interface SalesEventData {
   customerIndex: number;
@@ -505,7 +520,7 @@ export class MvpGameController extends Component {
     if (session?.isFinished) {
       this.removeChildByName('SkipSalesButton');
       if (!this.node.getChildByName('ContinuePurchaseButton')) {
-        this.createButton(this.node, 'ContinuePurchaseButton', this.getText('continuePurchaseButton'), 0, -520, 300, 70, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+        this.createButton(this.node, 'ContinuePurchaseButton', this.getText('continuePurchaseButton'), 0, -520, 300, 70, UI_COLORS.jadeLight, UI_COLORS.jadeDark, () => {
           this.activeSalesSession = null;
           this.productCardStatus.clear();
           this.showMarket();
@@ -513,7 +528,7 @@ export class MvpGameController extends Component {
       }
     } else {
       if (!this.node.getChildByName('SkipSalesButton')) {
-        this.createButton(this.node, 'SkipSalesButton', this.getText('skipSalesButton'), 0, -520, 300, 70, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+        this.createButton(this.node, 'SkipSalesButton', this.getText('skipSalesButton'), 0, -520, 300, 70, UI_COLORS.cardWarm, UI_COLORS.wood, () => {
           this.skipSalesProcess();
         });
       }
@@ -529,27 +544,23 @@ export class MvpGameController extends Component {
 
   private drawSalesResultBackdrop(): void {
     const graphics = this.getGraphicsForNode(this.node, 'SalesResultBackdrop');
-    graphics.fillColor = new Color(117, 82, 55, 255);
-    graphics.rect(-315, -290, 630, 72);
+    this.drawPanel(graphics, 650, 474, new Color(239, 218, 178, 245), UI_COLORS.woodDark, { x: 0, y: -16 }, 18);
+    graphics.fillColor = UI_COLORS.wood;
+    graphics.rect(-326, -300, 652, 78);
     graphics.fill();
-    graphics.fillColor = new Color(168, 113, 73, 255);
-    graphics.rect(-292, -252, 584, 34);
+    graphics.fillColor = UI_COLORS.woodLight;
+    graphics.rect(-292, -260, 584, 28);
     graphics.fill();
-    graphics.fillColor = new Color(236, 221, 184, 255);
-    graphics.strokeColor = new Color(102, 77, 55, 255);
-    graphics.lineWidth = 4;
-    graphics.rect(-318, -238, 636, 455);
+    graphics.fillColor = new Color(UI_COLORS.gold.r, UI_COLORS.gold.g, UI_COLORS.gold.b, 130);
+    graphics.rect(-300, 190, 600, 18);
     graphics.fill();
-    graphics.stroke();
-    graphics.fillColor = new Color(151, 96, 61, 255);
-    graphics.rect(-318, -18, 636, 18);
-    graphics.fill();
-    graphics.rect(-318, -238, 636, 18);
+    graphics.fillColor = UI_COLORS.woodDark;
+    graphics.rect(-320, -28, 640, 18);
     graphics.fill();
   }
 
   private createSalesSummaryCards(): void {
-    this.createResultStatCard('IncomeStatCard', this.getText('todayIncomeLabel'), `+${this.lastSalesResult.income}`, -210, 392, new Color(54, 148, 74, 255));
+    this.createResultStatCard('IncomeStatCard', this.getText('todayIncomeLabel'), `+${this.lastSalesResult.income}`, -210, 392, UI_COLORS.jadeDark, 198, 96, 30);
     this.createResultStatCard('SoldStatCard', this.getText('soldCountLabel'), `${this.lastSalesResult.soldCount}`, 0, 392, new Color(62, 96, 156, 255));
     this.createResultStatCard('UnsoldStatCard', this.getText('unsoldCountLabel'), `${this.lastSalesResult.unsoldCount}`, 210, 392, new Color(132, 93, 55, 255));
     this.createTextNode(
@@ -559,7 +570,7 @@ export class MvpGameController extends Component {
       0,
       320,
       22,
-      new Color(54, 50, 42, 255),
+      UI_COLORS.text,
       620
     );
   }
@@ -569,7 +580,8 @@ export class MvpGameController extends Component {
     const message = session?.message ?? this.getText('salesFinishedMessage');
     const progress = session ? `${session.processedCount}/${session.customerCount}` : `${this.lastSalesResult.customerCount}/${this.lastSalesResult.customerCount}`;
     const soldOutLine = session?.soldOutEarly ? `\n${this.getText('salesSoldOutMessage')}` : '';
-    this.createTextNode(this.node, 'SalesProcessMessage', `${message}\n${this.getText('customerProgressLabel')}: ${progress}${soldOutLine}`, 0, 282, 22, new Color(60, 52, 42, 255), 620);
+    this.drawPanel(this.getGraphicsForNode(this.node, 'SalesMessagePanel'), 620, 74, new Color(255, 249, 226, 236), UI_COLORS.wood, { x: 0, y: 282 }, 14);
+    this.createTextNode(this.node, 'SalesProcessMessage', `${message}\n${this.getText('customerProgressLabel')}: ${progress}${soldOutLine}`, 0, 276, 21, UI_COLORS.text, 584);
   }
 
   private clearSalesDynamicUi(): void {
@@ -581,23 +593,23 @@ export class MvpGameController extends Component {
     }
   }
 
-  private createResultStatCard(nodeName: string, title: string, value: string, x: number, y: number, valueColor: Color): void {
+  private createResultStatCard(nodeName: string, title: string, value: string, x: number, y: number, valueColor: Color, width = 190, height = 86, valueFontSize = 28): void {
     let card = this.node.getChildByName(nodeName);
     if (!card) {
       card = new Node(nodeName);
       this.node.addChild(card);
-      card.addComponent(UITransform).setContentSize(190, 86);
+      card.addComponent(UITransform).setContentSize(width, height);
       card.addComponent(Graphics);
     }
 
     card.layer = this.node.layer;
     card.setPosition(new Vec3(x, y, 2));
-    card.getComponent(UITransform)?.setContentSize(190, 86);
+    card.getComponent(UITransform)?.setContentSize(width, height);
     const graphics = card.getComponent(Graphics) ?? card.addComponent(Graphics);
     graphics.clear();
-    this.drawPanel(graphics, 190, 86, new Color(255, 248, 226, 245), new Color(102, 78, 55, 255));
-    this.createTextNode(card, `${nodeName}_Title`, title, 0, 17, 20, new Color(62, 55, 45, 255), 160);
-    this.createTextNode(card, `${nodeName}_Value`, value, 0, -20, 28, valueColor, 160);
+    this.drawPanel(graphics, width, height, new Color(255, 248, 226, 245), UI_COLORS.wood, undefined, 14);
+    this.createTextNode(card, `${nodeName}_Title`, title, 0, height * 0.2, 20, UI_COLORS.text, width - 24);
+    this.createTextNode(card, `${nodeName}_Value`, value, 0, -height * 0.22, valueFontSize, valueColor, width - 24);
   }
 
   private createSalesProductCards(): void {
@@ -658,15 +670,17 @@ export class MvpGameController extends Component {
     const graphics = card.getComponent(Graphics) ?? card.addComponent(Graphics);
     graphics.clear();
     const soldToday = status === 'sold';
-    const borderColor =
-      status === 'sold' ? new Color(55, 132, 70, 255) : status === 'pending' ? new Color(74, 110, 132, 255) : new Color(120, 94, 64, 255);
-    this.drawPanel(graphics, 184, 198, new Color(255, 252, 238, 250), borderColor);
+    const borderColor = status === 'sold' ? UI_COLORS.jadeDark : status === 'pending' ? UI_COLORS.wood : new Color(120, 94, 64, 255);
+    this.drawPanel(graphics, 184, 198, UI_COLORS.card, borderColor, undefined, 16);
+    graphics.fillColor = new Color(UI_COLORS.woodLight.r, UI_COLORS.woodLight.g, UI_COLORS.woodLight.b, 58);
+    graphics.rect(-74, -94, 148, 20);
+    graphics.fill();
     this.drawProductIcon(graphics, product, soldToday);
 
-    this.createTextNode(card, `ProductName_${product.id}`, product.displayName, 0, 64, 19, new Color(44, 48, 42, 255), 158);
+    this.createTextNode(card, `ProductName_${product.id}`, product.displayName, 0, 64, 19, UI_COLORS.text, 158);
     const pricePrefix = soldToday ? this.getText('priceLabel') : this.getText('listedPriceLabel');
-    const priceColor = soldToday ? new Color(43, 142, 62, 255) : new Color(88, 72, 52, 255);
-    this.createTextNode(card, `ProductPrice_${product.id}`, `${pricePrefix} +${visiblePrice}`, 0, -50, 18, priceColor, 158);
+    const priceColor = soldToday ? UI_COLORS.jadeDark : UI_COLORS.gold;
+    this.createTextNode(card, `ProductPrice_${product.id}`, `${pricePrefix} +${visiblePrice}`, 0, -50, 19, priceColor, 158);
     this.createProductStatusTag(card, product, status);
   }
 
@@ -989,8 +1003,8 @@ export class MvpGameController extends Component {
         438,
         140,
         48,
-        isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
-        isActive ? new Color(66, 116, 72, 255) : new Color(98, 83, 64, 255),
+        isActive ? UI_COLORS.jadeLight : UI_COLORS.cardWarm,
+        isActive ? UI_COLORS.jadeDark : UI_COLORS.wood,
         () => {
           this.showInventoryManagement(tab.filter);
         },
@@ -1002,7 +1016,11 @@ export class MvpGameController extends Component {
   private createShelfInfoPanel(): void {
     const shelfCount = this.countProductsByStatus('on_shelf');
     const shelfSlotCount = this.getShelfSlotCount();
-    this.drawPanel(this.getGraphicsForNode(this.node, 'InventoryInfoPanel'), 620, 72, new Color(255, 247, 218, 230), new Color(90, 75, 55, 255), { x: 0, y: 358 });
+    const graphics = this.getGraphicsForNode(this.node, 'InventoryInfoPanel');
+    this.drawPanel(graphics, 620, 76, new Color(255, 247, 218, 238), UI_COLORS.woodDark, { x: 0, y: 358 }, 14);
+    graphics.fillColor = new Color(UI_COLORS.jade.r, UI_COLORS.jade.g, UI_COLORS.jade.b, 56);
+    graphics.rect(-296, 346, 592, 24);
+    graphics.fill();
     this.createTextNode(
       this.node,
       'InventoryInfoText',
@@ -1010,10 +1028,10 @@ export class MvpGameController extends Component {
       0,
       352,
       22,
-      new Color(48, 58, 48, 255),
+      UI_COLORS.jadeDark,
       580
     );
-    this.createTextNode(this.node, 'InventoryStatusMessage', this.statusMessage, 0, 322, 18, new Color(80, 64, 48, 230), 580);
+    this.createTextNode(this.node, 'InventoryStatusMessage', this.statusMessage, 0, 322, 18, UI_COLORS.subText, 580);
   }
 
   private createInventoryProductCards(filter: InventoryFilter): void {
@@ -1089,11 +1107,14 @@ export class MvpGameController extends Component {
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(188, 226);
     const graphics = card.addComponent(Graphics);
-    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
-    this.drawPanel(graphics, 188, 226, new Color(255, 252, 238, 250), borderColor);
+    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? UI_COLORS.jadeDark : UI_COLORS.wood;
+    this.drawPanel(graphics, 188, 226, UI_COLORS.card, borderColor, undefined, 16);
+    graphics.fillColor = new Color(UI_COLORS.woodLight.r, UI_COLORS.woodLight.g, UI_COLORS.woodLight.b, 62);
+    graphics.rect(-78, -100, 156, 18);
+    graphics.fill();
     this.drawInventoryPreviewIcon(graphics, product);
 
-    this.createTextNode(card, `InventoryProductName_${product.id}`, product.displayName, 0, 88, 19, new Color(44, 48, 42, 255), 160);
+    this.createTextNode(card, `InventoryProductName_${product.id}`, product.displayName, 0, 88, 19, UI_COLORS.text, 160);
     this.createTextNode(
       card,
       `InventoryProductMeta_${product.id}`,
@@ -1101,10 +1122,10 @@ export class MvpGameController extends Component {
       22,
       45,
       15,
-      new Color(78, 70, 58, 230),
+      UI_COLORS.subText,
       120
     );
-    this.createTextNode(card, `InventoryProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 16, 17, new Color(88, 72, 52, 255), 160);
+    this.createTextNode(card, `InventoryProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 16, 19, UI_COLORS.gold, 160);
     this.createTextNode(card, `InventoryProductStatus_${product.id}`, this.getProductStatusText(product.status), 0, -13, 17, this.getProductStatusColor(product.status), 160);
 
     if (product.crackPenalty > 0) {
@@ -1112,11 +1133,11 @@ export class MvpGameController extends Component {
     }
 
     if (product.status === 'in_inventory') {
-      this.createButton(card, `ListProduct_${product.id}`, this.getText('listProductButton'), 0, -90, 112, 34, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+      this.createButton(card, `ListProduct_${product.id}`, this.getText('listProductButton'), 0, -90, 112, 34, UI_COLORS.jadeLight, UI_COLORS.jadeDark, () => {
         this.listProduct(product.id);
       }, 16);
     } else if (product.status === 'on_shelf') {
-      this.createButton(card, `UnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -90, 112, 34, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+      this.createButton(card, `UnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -90, 112, 34, UI_COLORS.cardWarm, UI_COLORS.wood, () => {
         this.unlistProduct(product.id);
       }, 16);
     }
@@ -1129,20 +1150,20 @@ export class MvpGameController extends Component {
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT);
     const graphics = card.addComponent(Graphics);
-    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
-    this.drawPanel(graphics, WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT, new Color(255, 252, 238, 248), borderColor);
+    const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? UI_COLORS.jadeDark : UI_COLORS.wood;
+    this.drawPanel(graphics, WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT, UI_COLORS.card, borderColor, undefined, 14);
     this.drawWarehousePreviewIcon(graphics, product);
 
-    this.createTextNode(card, `WarehouseProductName_${product.id}`, product.displayName, 0, 50, 17, new Color(44, 48, 42, 255), 160);
-    this.createTextNode(card, `WarehouseProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 0, 20, 15, new Color(88, 72, 52, 255), 160);
+    this.createTextNode(card, `WarehouseProductName_${product.id}`, product.displayName, 4, 50, 17, UI_COLORS.text, 150);
+    this.createTextNode(card, `WarehouseProductPrice_${product.id}`, `${this.getText('listedPriceLabel')}: ${product.listedPrice}`, 4, 20, 16, UI_COLORS.gold, 150);
     this.createTextNode(card, `WarehouseProductStatus_${product.id}`, this.getProductStatusText(product.status), 26, -8, 15, this.getProductStatusColor(product.status), 104);
 
     if (product.status === 'in_inventory') {
-      this.createButton(card, `WarehouseListProduct_${product.id}`, this.getText('listProductButton'), 0, -50, 96, 30, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+      this.createButton(card, `WarehouseListProduct_${product.id}`, this.getText('listProductButton'), 0, -50, 96, 30, UI_COLORS.jadeLight, UI_COLORS.jadeDark, () => {
         this.listProduct(product.id);
       }, 15);
     } else if (product.status === 'on_shelf') {
-      this.createButton(card, `WarehouseUnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -50, 96, 30, new Color(250, 241, 218, 255), new Color(128, 96, 54, 255), () => {
+      this.createButton(card, `WarehouseUnlistProduct_${product.id}`, this.getText('unlistProductButton'), 0, -50, 96, 30, UI_COLORS.cardWarm, UI_COLORS.wood, () => {
         this.unlistProduct(product.id);
       }, 15);
     }
@@ -1175,19 +1196,22 @@ export class MvpGameController extends Component {
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(188, 226);
     const graphics = card.addComponent(Graphics);
-    this.drawPanel(graphics, 188, 226, new Color(246, 241, 226, 190), new Color(118, 104, 86, 170));
-    graphics.strokeColor = new Color(118, 104, 86, 150);
+    this.drawPanel(graphics, 188, 226, new Color(246, 237, 212, 190), new Color(UI_COLORS.wood.r, UI_COLORS.wood.g, UI_COLORS.wood.b, 170), undefined, 16);
+    graphics.fillColor = new Color(UI_COLORS.woodLight.r, UI_COLORS.woodLight.g, UI_COLORS.woodLight.b, 70);
+    graphics.rect(-72, -82, 144, 28);
+    graphics.fill();
+    graphics.strokeColor = new Color(UI_COLORS.wood.r, UI_COLORS.wood.g, UI_COLORS.wood.b, 150);
     graphics.lineWidth = 2;
     graphics.rect(-64, -72, 128, 144);
     graphics.stroke();
-    this.createTextNode(card, `EmptyShelfSlotText_${slotIndex}`, this.getText('emptyShelfSlotLabel'), 0, 2, 23, new Color(96, 84, 68, 210), 150);
+    this.createTextNode(card, `EmptyShelfSlotText_${slotIndex}`, this.getText('emptyShelfSlotLabel'), 0, 2, 23, UI_COLORS.subText, 150);
   }
 
   private createInventoryActions(): void {
-    this.createButton(this.node, 'InventoryBackMarketButton', this.getText('backMarketButton'), -170, -565, 220, 62, new Color(248, 241, 221, 255), new Color(98, 83, 64, 255), () => {
+    this.createButton(this.node, 'InventoryBackMarketButton', this.getText('backMarketButton'), -170, -565, 220, 62, UI_COLORS.cardWarm, UI_COLORS.wood, () => {
       this.showMarket();
     }, 21);
-    this.createButton(this.node, 'InventoryStartSalesButton', this.getText('startSalesButton'), 170, -565, 220, 62, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
+    this.createButton(this.node, 'InventoryStartSalesButton', this.getText('startSalesButton'), 170, -565, 220, 62, UI_COLORS.jadeLight, UI_COLORS.jadeDark, () => {
       this.startDailySales();
     }, 21);
   }
@@ -1538,10 +1562,14 @@ export class MvpGameController extends Component {
   }
 
   private createHud(parent: Node, title: string): void {
-    this.drawPanel(this.getGraphicsForNode(parent, 'MvpHudBackground'), 660, 112, new Color(255, 247, 218, 236), new Color(90, 75, 55, 255), { x: 0, y: 560 });
-    this.createTextNode(parent, 'HudDayText', this.getText('dayLabel').replace('{day}', `${this.day}`), -236, 578, 24, new Color(43, 42, 35, 255), 190);
-    this.createTextNode(parent, 'HudCoinText', `${this.getText('coinLabel')}: ${this.coins}`, 128, 578, 24, new Color(43, 84, 44, 255), 260);
-    this.createTextNode(parent, 'HudTitleText', title, 0, 532, 28, new Color(58, 45, 35, 255), 360);
+    const graphics = this.getGraphicsForNode(parent, 'MvpHudBackground');
+    this.drawPanel(graphics, 660, 112, new Color(255, 247, 221, 244), UI_COLORS.woodDark, { x: 0, y: 560 }, 16);
+    graphics.fillColor = new Color(UI_COLORS.gold.r, UI_COLORS.gold.g, UI_COLORS.gold.b, 210);
+    graphics.rect(-314, 506, 628, 8);
+    graphics.fill();
+    this.createTextNode(parent, 'HudDayText', this.getText('dayLabel').replace('{day}', `${this.day}`), -236, 578, 24, UI_COLORS.text, 190);
+    this.createTextNode(parent, 'HudCoinText', `${this.getText('coinLabel')}: ${this.coins}`, 128, 578, 27, UI_COLORS.jadeDark, 260);
+    this.createTextNode(parent, 'HudTitleText', title, 0, 532, 30, UI_COLORS.text, 360);
   }
 
   private createMiniHud(): void {
@@ -1587,7 +1615,7 @@ export class MvpGameController extends Component {
     node.setPosition(new Vec3(x, y, 2));
     node.addComponent(UITransform).setContentSize(width, height);
     const graphics = node.addComponent(Graphics);
-    this.drawPanel(graphics, width, height, fill, stroke);
+    this.drawPanel(graphics, width, height, fill, stroke, undefined, 12);
     const labelNode = this.createTextNode(node, `${nodeName}_Text`, text, 0, 0, fontSize, new Color(44, 48, 42, 255), width - 12);
     labelNode.setPosition(new Vec3(0, -fontSize * 0.35, 3));
     node.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
@@ -1608,18 +1636,28 @@ export class MvpGameController extends Component {
 
   private drawStageBackground(graphics: Graphics): void {
     graphics.clear();
-    graphics.fillColor = new Color(157, 145, 136, 255);
+    graphics.fillColor = UI_COLORS.background;
     graphics.rect(-PORTRAIT_WIDTH * 0.5, -PORTRAIT_HEIGHT * 0.5, PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
+    graphics.fill();
+    graphics.fillColor = new Color(UI_COLORS.backgroundBand.r, UI_COLORS.backgroundBand.g, UI_COLORS.backgroundBand.b, 120);
+    graphics.rect(-PORTRAIT_WIDTH * 0.5, -PORTRAIT_HEIGHT * 0.5, PORTRAIT_WIDTH, 92);
+    graphics.fill();
+    graphics.rect(-PORTRAIT_WIDTH * 0.5, PORTRAIT_HEIGHT * 0.5 - 124, PORTRAIT_WIDTH, 124);
     graphics.fill();
   }
 
-  private drawPanel(graphics: Graphics, width: number, height: number, fill: Color, stroke: Color, offset?: Vec2Data): void {
+  private drawPanel(graphics: Graphics, width: number, height: number, fill: Color, stroke: Color, offset?: Vec2Data, radius = 10): void {
     const x = offset?.x ?? 0;
     const y = offset?.y ?? 0;
     graphics.fillColor = fill;
     graphics.strokeColor = stroke;
     graphics.lineWidth = 3;
-    graphics.rect(x - width * 0.5, y - height * 0.5, width, height);
+    const roundedGraphics = graphics as Graphics & { roundRect?: (x: number, y: number, width: number, height: number, radius: number) => void };
+    if (roundedGraphics.roundRect) {
+      roundedGraphics.roundRect(x - width * 0.5, y - height * 0.5, width, height, radius);
+    } else {
+      graphics.rect(x - width * 0.5, y - height * 0.5, width, height);
+    }
     graphics.fill();
     graphics.stroke();
   }
