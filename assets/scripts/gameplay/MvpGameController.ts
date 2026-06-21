@@ -82,6 +82,7 @@ export class MvpGameController extends Component {
   private activeSalesSession: SalesSessionData | null = null;
   private salesSequenceToken = 0;
   private toastSequenceToken = 0;
+  private inventoryRefreshToken = 0;
   private processingSequenceToken = 0;
   private productCardStatus = new Map<string, string>();
   private inventoryFilter: InventoryFilter = 'all';
@@ -110,6 +111,7 @@ export class MvpGameController extends Component {
     this.activeSalesSession = null;
     this.salesSequenceToken = 0;
     this.toastSequenceToken = 0;
+    this.inventoryRefreshToken = 0;
     this.processingSequenceToken = 0;
     this.inventoryFilter = 'all';
     this.newlyCompletedProductCount = 0;
@@ -1070,11 +1072,25 @@ export class MvpGameController extends Component {
     }
 
     if (allProducts.length === 0) {
-      this.createTextNode(contentArea, 'InventoryEmptyHint', this.getText('emptyInventoryHint'), 0, 92, 28, new Color(78, 70, 58, 255), 520);
+      this.createTextNode(contentArea, 'InventoryEmptyHint', this.getEmptyInventoryHint(filter), 0, 92, 28, new Color(78, 70, 58, 255), 520);
       return;
     }
 
     this.createWarehouseScrollGrid(contentArea, allProducts);
+  }
+
+  private getEmptyInventoryHint(filter: InventoryFilter): string {
+    switch (filter) {
+      case 'in_inventory':
+        return this.getText('emptyInventoryProductsHint');
+      case 'on_shelf':
+        return this.getText('emptyShelfProductsHint');
+      case 'sold':
+        return this.getText('emptySoldProductsHint');
+      case 'all':
+      default:
+        return this.getText('emptyInventoryHint');
+    }
   }
 
   private createWarehouseScrollGrid(parent: Node, products: FinishedProductData[]): void {
@@ -1256,7 +1272,7 @@ export class MvpGameController extends Component {
 
     product.status = 'on_shelf';
     product.isSold = false;
-    this.showInventoryManagement(this.inventoryFilter);
+    this.scheduleInventoryRefresh(this.inventoryFilter);
   }
 
   private unlistProduct(productId: string): void {
@@ -1268,7 +1284,19 @@ export class MvpGameController extends Component {
     product.status = 'in_inventory';
     product.isSold = false;
     product.soldDay = null;
-    this.showInventoryManagement(this.inventoryFilter);
+    this.scheduleInventoryRefresh(this.inventoryFilter);
+  }
+
+  private scheduleInventoryRefresh(filter: InventoryFilter): void {
+    this.inventoryRefreshToken += 1;
+    const refreshToken = this.inventoryRefreshToken;
+    this.scheduleOnce(() => {
+      if (refreshToken !== this.inventoryRefreshToken || !this.node.isValid) {
+        return;
+      }
+
+      this.showInventoryManagement(filter);
+    }, 0);
   }
 
   private refreshMarket(): void {
@@ -1745,6 +1773,7 @@ export class MvpGameController extends Component {
   private clearUi(): void {
     this.ensureUiRoot();
     this.toastSequenceToken += 1;
+    this.inventoryRefreshToken += 1;
     this.clearLayerChildren(this.getPageContentLayer());
     this.clearLayerChildren(this.getTopBarLayer());
     this.clearLayerChildren(this.getBottomBarLayer());
