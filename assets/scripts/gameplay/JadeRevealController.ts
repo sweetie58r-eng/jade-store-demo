@@ -92,6 +92,17 @@ export class JadeRevealController extends Component {
     this.unbindInput();
   }
 
+  public shutdown(): void {
+    this.unbindInput();
+    this.unscheduleAllCallbacks();
+    this.removeRevealUi();
+    this.isPainting = false;
+    this.isAdjustingBrush = false;
+    this.lastPaintPoint = null;
+    this.brushPoint = null;
+    this.onRevealCompleted = null;
+  }
+
   private bindInput(): void {
     this.unbindInput();
     input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);

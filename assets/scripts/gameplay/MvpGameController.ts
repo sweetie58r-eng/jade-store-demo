@@ -229,6 +229,7 @@ export class MvpGameController extends Component {
     }
 
     this.clearUi();
+    this.jadeLayer?.getComponent(JadeRevealController)?.shutdown();
     this.carvingLayer.active = true;
     const carvingController = this.carvingLayer.getComponent(CarvingLayoutController) ?? this.carvingLayer.addComponent(CarvingLayoutController);
     carvingController.initialize(
@@ -665,6 +666,7 @@ export class MvpGameController extends Component {
       card.layer = this.node.layer;
       card.addComponent(UITransform).setContentSize(184, 198);
       card.addComponent(Graphics);
+      this.swallowTouches(card);
     } else if (this.productCardStatus.get(product.id) === statusKey) {
       card.setPosition(new Vec3(x, y, 2));
       return;
@@ -1082,6 +1084,9 @@ export class MvpGameController extends Component {
     scrollNode.setPosition(new Vec3(0, 0, 2));
     scrollNode.addComponent(UITransform).setContentSize(WAREHOUSE_VIEW_WIDTH, WAREHOUSE_VIEW_HEIGHT);
     scrollNode.addComponent(Mask);
+    scrollNode.on(Node.EventType.TOUCH_START, stopPropagation);
+    scrollNode.on(Node.EventType.TOUCH_END, stopPropagation);
+    scrollNode.on(Node.EventType.TOUCH_CANCEL, stopPropagation);
 
     const content = new Node('WarehouseScrollContent');
     scrollNode.addChild(content);
@@ -1122,6 +1127,7 @@ export class MvpGameController extends Component {
     card.layer = parent.layer;
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(188, 226);
+    this.swallowTouches(card);
     const graphics = card.addComponent(Graphics);
     const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
     this.drawPanel(graphics, 188, 226, new Color(255, 252, 238, 250), borderColor);
@@ -1162,6 +1168,7 @@ export class MvpGameController extends Component {
     card.layer = parent.layer;
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT);
+    this.swallowTouches(card);
     const graphics = card.addComponent(Graphics);
     const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
     this.drawPanel(graphics, WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT, new Color(255, 252, 238, 248), borderColor);
@@ -1208,6 +1215,7 @@ export class MvpGameController extends Component {
     card.layer = parent.layer;
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(188, 226);
+    this.swallowTouches(card);
     const graphics = card.addComponent(Graphics);
     this.drawPanel(graphics, 188, 226, new Color(246, 241, 226, 190), new Color(118, 104, 86, 170));
     graphics.strokeColor = new Color(118, 104, 86, 150);
@@ -1463,6 +1471,7 @@ export class MvpGameController extends Component {
 
   private shutdownWorkLayers(): void {
     this.getCarvingController()?.shutdown();
+    this.jadeLayer?.getComponent(JadeRevealController)?.shutdown();
     if (this.jadeLayer) {
       this.jadeLayer.active = false;
     }
@@ -1632,6 +1641,13 @@ export class MvpGameController extends Component {
     }, 1);
   }
 
+  private swallowTouches(node: Node): void {
+    node.on(Node.EventType.TOUCH_START, stopPropagation);
+    node.on(Node.EventType.TOUCH_MOVE, stopPropagation);
+    node.on(Node.EventType.TOUCH_END, stopPropagation);
+    node.on(Node.EventType.TOUCH_CANCEL, stopPropagation);
+  }
+
   private createTextNode(parent: Node, nodeName: string, text: string, x: number, y: number, fontSize: number, color: Color, width: number): Node {
     let node = parent.getChildByName(nodeName);
     if (!node) {
@@ -1674,6 +1690,9 @@ export class MvpGameController extends Component {
     this.drawPanel(graphics, width, height, fill, stroke);
     const labelNode = this.createTextNode(node, `${nodeName}_Text`, text, 0, 0, fontSize, new Color(44, 48, 42, 255), width - 12);
     labelNode.setPosition(new Vec3(0, -fontSize * 0.35, 3));
+    node.on(Node.EventType.TOUCH_START, stopPropagation);
+    node.on(Node.EventType.TOUCH_MOVE, stopPropagation);
+    node.on(Node.EventType.TOUCH_CANCEL, stopPropagation);
     node.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
       stopPropagation(event);
       onClick();
