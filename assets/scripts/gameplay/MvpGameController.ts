@@ -160,6 +160,7 @@ export class MvpGameController extends Component {
       this.advanceDay();
     }, 20);
     this.ensureRequiredUiVisible('market');
+    this.ensureMarketFrameVisible();
     this.updateDebugInfo();
     this.arrangeLayers?.();
   }
@@ -996,6 +997,8 @@ export class MvpGameController extends Component {
     this.updateDebugInfo();
     this.arrangeLayers?.();
     this.ensureRequiredUiVisible('inventory');
+    this.ensureInventoryFrameVisible(filter);
+    this.ensureInventoryContentVisible(filter);
   }
 
   private createInventoryTabs(): void {
@@ -1020,7 +1023,7 @@ export class MvpGameController extends Component {
         isActive ? new Color(222, 246, 220, 255) : new Color(248, 241, 221, 245),
         isActive ? new Color(66, 116, 72, 255) : new Color(98, 83, 64, 255),
         () => {
-          this.showInventoryManagement(tab.filter);
+          this.refreshInventoryContent(tab.filter);
         },
         18
       );
@@ -1272,7 +1275,7 @@ export class MvpGameController extends Component {
 
     product.status = 'on_shelf';
     product.isSold = false;
-    this.scheduleInventoryRefresh(this.inventoryFilter);
+    this.scheduleInventoryContentRefresh(this.inventoryFilter);
   }
 
   private unlistProduct(productId: string): void {
@@ -1284,10 +1287,10 @@ export class MvpGameController extends Component {
     product.status = 'in_inventory';
     product.isSold = false;
     product.soldDay = null;
-    this.scheduleInventoryRefresh(this.inventoryFilter);
+    this.scheduleInventoryContentRefresh(this.inventoryFilter);
   }
 
-  private scheduleInventoryRefresh(filter: InventoryFilter): void {
+  private scheduleInventoryContentRefresh(filter: InventoryFilter): void {
     this.inventoryRefreshToken += 1;
     const refreshToken = this.inventoryRefreshToken;
     this.scheduleOnce(() => {
@@ -1295,8 +1298,67 @@ export class MvpGameController extends Component {
         return;
       }
 
-      this.showInventoryManagement(filter);
+      this.refreshInventoryContent(filter);
     }, 0);
+  }
+
+  private refreshInventoryContent(filter: InventoryFilter): void {
+    this.inventoryFilter = filter;
+    this.clearInventoryContentAreas();
+    this.createInventoryTabs();
+    this.createShelfInfoPanel();
+    this.createInventoryProductCards(filter);
+    this.ensureInventoryFrameVisible(filter);
+    this.ensureInventoryContentVisible(filter);
+    this.updateDebugInfo();
+  }
+
+  private clearInventoryContentAreas(): void {
+    const pageRoot = this.getPageContentLayer();
+    for (const name of ['TabArea', 'InfoArea', 'ContentArea']) {
+      const child = pageRoot.getChildByName(name);
+      if (child) {
+        child.destroy();
+      }
+    }
+  }
+
+  private ensureInventoryContentVisible(filter: InventoryFilter): void {
+    const pageRoot = this.getPageContentLayer();
+    const missingAreaNames = ['TabArea', 'InfoArea', 'ContentArea'].filter((name) => !pageRoot.getChildByName(name));
+    if (missingAreaNames.length === 0) {
+      return;
+    }
+
+    console.warn(`[MvpGameController] inventory content missing after refresh: ${missingAreaNames.join(',')}`);
+    this.clearInventoryContentAreas();
+    this.createInventoryTabs();
+    this.createShelfInfoPanel();
+    this.createInventoryProductCards(filter);
+  }
+
+  private ensureInventoryFrameVisible(filter: InventoryFilter): void {
+    const topBar = this.getTopBarLayer();
+    if (!topBar.getChildByName('MvpHudBackground')) {
+      console.warn('[MvpGameController] inventory top bar missing; recreating it');
+      const title = filter === 'on_shelf' ? this.getText('stallManageTitle') : this.getText('inventoryManageTitle');
+      this.createHud(topBar, title, 'stocking');
+    }
+
+    const bottomBar = this.getBottomBarLayer();
+    if (!bottomBar.getChildByName('InventoryBackMarketButton') || !bottomBar.getChildByName('InventoryStartSalesButton')) {
+      console.warn('[MvpGameController] inventory bottom actions missing; recreating them');
+      this.clearBottomBar();
+      this.createInventoryActions();
+    }
+  }
+
+  private ensureMarketFrameVisible(): void {
+    const topBar = this.getTopBarLayer();
+    if (!topBar.getChildByName('MvpHudBackground')) {
+      console.warn('[MvpGameController] market top bar missing; recreating it');
+      this.createHud(topBar, this.getText('marketTitle'), 'purchasing');
+    }
   }
 
   private refreshMarket(): void {
