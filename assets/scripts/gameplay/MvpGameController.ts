@@ -1318,6 +1318,7 @@ export class MvpGameController extends Component {
     for (const name of ['TabArea', 'InfoArea', 'ContentArea']) {
       const child = pageRoot.getChildByName(name);
       if (child) {
+        child.removeFromParent();
         child.destroy();
       }
     }
@@ -1325,12 +1326,13 @@ export class MvpGameController extends Component {
 
   private ensureInventoryContentVisible(filter: InventoryFilter): void {
     const pageRoot = this.getPageContentLayer();
-    const missingAreaNames = ['TabArea', 'InfoArea', 'ContentArea'].filter((name) => !pageRoot.getChildByName(name));
-    if (missingAreaNames.length === 0) {
+    const missingAreaNames = ['TabArea', 'InfoArea', 'ContentArea'].filter((name) => !this.getValidChildByName(pageRoot, name));
+    const contentArea = this.getValidChildByName(pageRoot, 'ContentArea');
+    if (missingAreaNames.length === 0 && contentArea && contentArea.children.length > 0) {
       return;
     }
 
-    console.warn(`[MvpGameController] inventory content missing after refresh: ${missingAreaNames.join(',')}`);
+    console.warn(`[MvpGameController] inventory content missing after refresh: ${missingAreaNames.join(',') || 'empty ContentArea'}`);
     this.clearInventoryContentAreas();
     this.createInventoryTabs();
     this.createShelfInfoPanel();
@@ -1339,14 +1341,14 @@ export class MvpGameController extends Component {
 
   private ensureInventoryFrameVisible(filter: InventoryFilter): void {
     const topBar = this.getTopBarLayer();
-    if (!topBar.getChildByName('MvpHudBackground')) {
+    if (!this.getValidChildByName(topBar, 'MvpHudBackground')) {
       console.warn('[MvpGameController] inventory top bar missing; recreating it');
       const title = filter === 'on_shelf' ? this.getText('stallManageTitle') : this.getText('inventoryManageTitle');
       this.createHud(topBar, title, 'stocking');
     }
 
     const bottomBar = this.getBottomBarLayer();
-    if (!bottomBar.getChildByName('InventoryBackMarketButton') || !bottomBar.getChildByName('InventoryStartSalesButton')) {
+    if (!this.getValidChildByName(bottomBar, 'InventoryBackMarketButton') || !this.getValidChildByName(bottomBar, 'InventoryStartSalesButton')) {
       console.warn('[MvpGameController] inventory bottom actions missing; recreating them');
       this.clearBottomBar();
       this.createInventoryActions();
@@ -1355,7 +1357,7 @@ export class MvpGameController extends Component {
 
   private ensureMarketFrameVisible(): void {
     const topBar = this.getTopBarLayer();
-    if (!topBar.getChildByName('MvpHudBackground')) {
+    if (!this.getValidChildByName(topBar, 'MvpHudBackground')) {
       console.warn('[MvpGameController] market top bar missing; recreating it');
       this.createHud(topBar, this.getText('marketTitle'), 'purchasing');
     }
@@ -1690,7 +1692,7 @@ export class MvpGameController extends Component {
 
   private getShopAreaLayer(name: string, y: number, width: number, height: number): Node {
     const pageRoot = this.getPageContentLayer();
-    let area = pageRoot.getChildByName(name);
+    let area = this.getValidChildByName(pageRoot, name);
     if (!area) {
       area = new Node(name);
       pageRoot.addChild(area);
@@ -1739,7 +1741,7 @@ export class MvpGameController extends Component {
   }
 
   private createTextNode(parent: Node, nodeName: string, text: string, x: number, y: number, fontSize: number, color: Color, width: number): Node {
-    let node = parent.getChildByName(nodeName);
+    let node = this.getValidChildByName(parent, nodeName);
     if (!node) {
       node = new Node(nodeName);
       parent.addChild(node);
@@ -1818,7 +1820,7 @@ export class MvpGameController extends Component {
   }
 
   private getGraphicsForNode(parent: Node, nodeName: string): Graphics {
-    let node = parent.getChildByName(nodeName);
+    let node = this.getValidChildByName(parent, nodeName);
     if (!node) {
       node = new Node(nodeName);
       parent.addChild(node);
@@ -1863,6 +1865,7 @@ export class MvpGameController extends Component {
 
   private clearLayerChildren(layer: Node): void {
     for (const child of [...layer.children]) {
+      child.removeFromParent();
       child.destroy();
     }
   }
@@ -1875,8 +1878,23 @@ export class MvpGameController extends Component {
       this.getPopupLayer().getChildByName(name) ??
       this.node.getChildByName(name);
     if (child) {
+      child.removeFromParent();
       child.destroy();
     }
+  }
+
+  private getValidChildByName(parent: Node, name: string): Node | null {
+    const child = parent.getChildByName(name);
+    if (!child) {
+      return null;
+    }
+
+    if (!child.isValid) {
+      child.removeFromParent();
+      return null;
+    }
+
+    return child;
   }
 
   private ensureUiRoot(): void {
