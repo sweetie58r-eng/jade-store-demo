@@ -1,4 +1,4 @@
-import { Color, Component, EventTouch, Graphics, Label, Mask, Node, ScrollView, UITransform, Vec3, _decorator } from 'cc';
+import { Color, Component, EventTouch, Graphics, Label, Mask, Node, UITransform, Vec3, _decorator } from 'cc';
 
 import { CustomerTypeConfig, LoadedGameConfigs } from '../config/GameConfigTypes';
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
@@ -23,6 +23,7 @@ const DEFAULT_SHELF_SLOT_COUNT = 6;
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
+type BusinessDayPhase = 'purchasing' | 'stocking' | 'selling' | 'closing';
 const WAREHOUSE_COLUMNS = 3;
 const WAREHOUSE_CARD_WIDTH = 198;
 const WAREHOUSE_CARD_HEIGHT = 146;
@@ -125,7 +126,7 @@ export class MvpGameController extends Component {
     const bottomRoot = this.getBottomBarLayer();
     const graphics = this.getGraphicsForNode(this.getBackgroundLayer(), 'StageBackground');
     this.drawStageBackground(graphics);
-    this.createHud(this.getTopBarLayer(), this.getText('marketTitle'));
+    this.createHud(this.getTopBarLayer(), this.getText('marketTitle'), 'purchasing');
 
     const positions = [
       { x: -170, y: 360 },
@@ -153,7 +154,7 @@ export class MvpGameController extends Component {
     this.createButton(bottomRoot, 'StartSalesButton', this.getText('startSalesButton'), 82, -590, 132, 54, new Color(222, 246, 220, 255), new Color(66, 116, 72, 255), () => {
       this.startDailySales();
     }, 20);
-    this.createButton(bottomRoot, 'NextDayButton', this.getText('nextDayButton'), 246, -590, 132, 54, new Color(232, 241, 252, 255), new Color(74, 110, 132, 255), () => {
+    this.createButton(bottomRoot, 'NextDayButton', this.getText('enterNextDayButton').replace('{day}', `${this.day + 1}`), 246, -590, 150, 54, new Color(232, 241, 252, 255), new Color(74, 110, 132, 255), () => {
       this.advanceDay();
     }, 20);
     this.ensureRequiredUiVisible('market');
@@ -204,7 +205,7 @@ export class MvpGameController extends Component {
     }
 
     this.clearUi();
-    this.createMiniHud();
+    this.createMiniHud('stocking');
     this.jadeLayer.active = true;
     this.carvingLayer.active = false;
     this.getCarvingController()?.shutdown();
@@ -270,7 +271,7 @@ export class MvpGameController extends Component {
     const pageRoot = this.getPageContentLayer();
     const graphics = this.getGraphicsForNode(this.getBackgroundLayer(), 'StageBackground');
     this.drawStageBackground(graphics);
-    this.createHud(this.getTopBarLayer(), this.getText('processingTitle'));
+    this.createHud(this.getTopBarLayer(), this.getText('processingTitle'), 'stocking');
 
     const pendingProductCount = this.processingJobs.reduce((sum, job) => sum + job.estimatedProducts.length, 0);
     this.drawProcessingWorkbench();
@@ -515,12 +516,14 @@ export class MvpGameController extends Component {
 
     this.drawSalesResultBackdrop();
     this.clearSalesDynamicUi();
-    this.createHud(this.getTopBarLayer(), this.getText('stallResultTitle'));
+    const session = this.activeSalesSession;
+    const title = session?.isFinished ? this.getText('dailyLedgerTitle') : this.getText('stallResultTitle');
+    const phase: BusinessDayPhase = session?.isFinished ? 'closing' : 'selling';
+    this.createHud(this.getTopBarLayer(), title, phase);
     this.createSalesSummaryCards();
     this.createSalesProcessMessage();
     this.createSalesProductCards();
 
-    const session = this.activeSalesSession;
     this.clearBottomBar();
     if (session?.isFinished) {
       this.removeChildByName('SkipSalesButton');
@@ -981,7 +984,7 @@ export class MvpGameController extends Component {
     const graphics = this.getGraphicsForNode(this.getBackgroundLayer(), 'StageBackground');
     this.drawStageBackground(graphics);
     const title = filter === 'on_shelf' ? this.getText('stallManageTitle') : this.getText('inventoryManageTitle');
-    this.createHud(this.getTopBarLayer(), title);
+    this.createHud(this.getTopBarLayer(), title, 'stocking');
     this.createInventoryTabs();
     this.createShelfInfoPanel();
     this.createInventoryProductCards(filter);
@@ -1079,21 +1082,29 @@ export class MvpGameController extends Component {
     scrollNode.setPosition(new Vec3(0, 0, 2));
     scrollNode.addComponent(UITransform).setContentSize(WAREHOUSE_VIEW_WIDTH, WAREHOUSE_VIEW_HEIGHT);
     scrollNode.addComponent(Mask);
-    const scrollView = scrollNode.addComponent(ScrollView);
-    scrollView.horizontal = false;
-    scrollView.vertical = true;
-    scrollView.inertia = true;
 
     const content = new Node('WarehouseScrollContent');
     scrollNode.addChild(content);
-    content.layer = this.node.layer;
+    content.layer = scrollNode.layer;
     const rowCount = Math.ceil(products.length / WAREHOUSE_COLUMNS);
     const contentHeight = Math.max(WAREHOUSE_VIEW_HEIGHT, rowCount * WAREHOUSE_ROW_GAP + 34);
     const contentTransform = content.addComponent(UITransform);
     contentTransform.setAnchorPoint(0.5, 1);
     contentTransform.setContentSize(WAREHOUSE_VIEW_WIDTH, contentHeight);
-    content.setPosition(new Vec3(0, WAREHOUSE_VIEW_HEIGHT * 0.5, 1));
-    scrollView.content = content;
+    const baseContentY = WAREHOUSE_VIEW_HEIGHT * 0.5;
+    const maxScrollY = Math.max(0, contentHeight - WAREHOUSE_VIEW_HEIGHT);
+    content.setPosition(new Vec3(0, baseContentY, 1));
+    scrollNode.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
+      stopPropagation(event);
+      if (maxScrollY <= 0 || !content.isValid) {
+        return;
+      }
+
+      const delta = event.getUIDelta();
+      const currentPosition = content.position;
+      const nextY = clamp(currentPosition.y + delta.y, baseContentY, baseContentY + maxScrollY);
+      content.setPosition(new Vec3(currentPosition.x, nextY, currentPosition.z));
+    });
 
     const columnX = [-218, 0, 218];
     products.forEach((product, index) => {
@@ -1557,15 +1568,25 @@ export class MvpGameController extends Component {
     });
   }
 
-  private createHud(parent: Node, title: string): void {
+  private createHud(parent: Node, title: string, phase: BusinessDayPhase): void {
     this.drawPanel(this.getGraphicsForNode(parent, 'MvpHudBackground'), 660, 112, new Color(255, 247, 218, 236), new Color(90, 75, 55, 255), { x: 0, y: 560 });
-    this.createTextNode(parent, 'HudDayText', this.getText('dayLabel').replace('{day}', `${this.day}`), -236, 578, 24, new Color(43, 42, 35, 255), 190);
-    this.createTextNode(parent, 'HudCoinText', `${this.getText('coinLabel')}: ${this.coins}`, 128, 578, 24, new Color(43, 84, 44, 255), 260);
+    this.createTextNode(parent, 'HudDayText', this.getDayPhaseText(phase), -190, 578, 23, new Color(43, 42, 35, 255), 300);
+    this.createTextNode(parent, 'HudCoinText', `${this.getText('coinLabel')}: ${this.coins}`, 176, 578, 24, new Color(43, 84, 44, 255), 220);
     this.createTextNode(parent, 'HudTitleText', title, 0, 532, 28, new Color(58, 45, 35, 255), 360);
   }
 
-  private createMiniHud(): void {
-    this.createTextNode(this.getTopBarLayer(), 'MiniHudText', `${this.getText('dayLabel').replace('{day}', `${this.day}`)}  ${this.getText('coinLabel')}: ${this.coins}`, 0, 612, 22, new Color(48, 64, 48, 255), 520);
+  private createMiniHud(phase: BusinessDayPhase): void {
+    this.createTextNode(this.getTopBarLayer(), 'MiniHudText', `${this.getDayPhaseText(phase)}  ${this.getText('coinLabel')}: ${this.coins}`, 0, 612, 22, new Color(48, 64, 48, 255), 580);
+  }
+
+  private getDayPhaseText(phase: BusinessDayPhase): string {
+    const phaseKeyById: Record<BusinessDayPhase, string> = {
+      purchasing: 'phasePurchasing',
+      stocking: 'phaseStocking',
+      selling: 'phaseSelling',
+      closing: 'phaseClosing'
+    };
+    return `${this.getText('dayLabel').replace('{day}', `${this.day}`)} · ${this.getText(phaseKeyById[phase])}`;
   }
 
   private getShopAreaLayer(name: string, y: number, width: number, height: number): Node {
