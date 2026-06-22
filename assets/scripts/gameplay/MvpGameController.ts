@@ -12,11 +12,24 @@ import { JadeDemoRenderer } from '../render/JadeDemoRenderer';
 import { CarvingLayoutController } from './CarvingLayoutController';
 import { JadeRevealController } from './JadeRevealController';
 import { SettlementCalculator } from './SettlementCalculator';
+import {
+  JADE_WORK_AREA,
+  PORTRAIT_HEIGHT,
+  PORTRAIT_WIDTH,
+  SHOP_BOTTOM_BUTTON_Y,
+  SHOP_CONTENT_AREA_Y,
+  SHOP_INFO_AREA_Y,
+  SHOP_TAB_AREA_Y,
+  WAREHOUSE_CARD_HEIGHT,
+  WAREHOUSE_CARD_WIDTH,
+  WAREHOUSE_COLUMNS,
+  WAREHOUSE_ROW_GAP,
+  WAREHOUSE_VIEW_HEIGHT,
+  WAREHOUSE_VIEW_WIDTH
+} from './ShopLayoutConstants';
+import { ShopUiRenderer } from './ShopUiRenderer';
 
 const { ccclass } = _decorator;
-const PORTRAIT_WIDTH = 720;
-const PORTRAIT_HEIGHT = 1280;
-const JADE_WORK_AREA = { x: -330, y: -338, width: 660, height: 770 };
 const SALES_EVENT_INTERVAL_SECONDS = 0.62;
 const PROCESSING_ANIMATION_SECONDS = 1.35;
 const DEFAULT_SHELF_SLOT_COUNT = 6;
@@ -24,16 +37,6 @@ const DEFAULT_SHELF_SLOT_COUNT = 6;
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
 type BusinessDayPhase = 'purchasing' | 'stocking' | 'selling' | 'closing';
-const WAREHOUSE_COLUMNS = 3;
-const WAREHOUSE_CARD_WIDTH = 198;
-const WAREHOUSE_CARD_HEIGHT = 146;
-const WAREHOUSE_ROW_GAP = 166;
-const WAREHOUSE_VIEW_WIDTH = 650;
-const WAREHOUSE_VIEW_HEIGHT = 660;
-const SHOP_TAB_AREA_Y = 430;
-const SHOP_INFO_AREA_Y = 360;
-const SHOP_CONTENT_AREA_Y = -82;
-const SHOP_BOTTOM_BUTTON_Y = -565;
 
 interface SalesEventData {
   customerIndex: number;
@@ -1670,14 +1673,19 @@ export class MvpGameController extends Component {
   }
 
   private createHud(parent: Node, title: string, phase: BusinessDayPhase): void {
-    this.drawPanel(this.getGraphicsForNode(parent, 'MvpHudBackground'), 660, 112, new Color(255, 247, 218, 236), new Color(90, 75, 55, 255), { x: 0, y: 560 });
-    this.createTextNode(parent, 'HudDayText', this.getDayPhaseText(phase), -190, 578, 23, new Color(43, 42, 35, 255), 300);
-    this.createTextNode(parent, 'HudCoinText', `${this.getText('coinLabel')}: ${this.coins}`, 176, 578, 24, new Color(43, 84, 44, 255), 220);
-    this.createTextNode(parent, 'HudTitleText', title, 0, 532, 28, new Color(58, 45, 35, 255), 360);
+    ShopUiRenderer.createHud(
+      parent,
+      {
+        dayPhaseText: this.getDayPhaseText(phase),
+        coinText: `${this.getText('coinLabel')}: ${this.coins}`,
+        title
+      },
+      (targetParent, nodeName) => this.getGraphicsForNode(targetParent, nodeName)
+    );
   }
 
   private createMiniHud(phase: BusinessDayPhase): void {
-    this.createTextNode(this.getTopBarLayer(), 'MiniHudText', `${this.getDayPhaseText(phase)}  ${this.getText('coinLabel')}: ${this.coins}`, 0, 612, 22, new Color(48, 64, 48, 255), 580);
+    ShopUiRenderer.createMiniHud(this.getTopBarLayer(), `${this.getDayPhaseText(phase)}  ${this.getText('coinLabel')}: ${this.coins}`);
   }
 
   private getDayPhaseText(phase: BusinessDayPhase): string {
@@ -1712,14 +1720,7 @@ export class MvpGameController extends Component {
     const popupRoot = this.getPopupLayer();
     this.removeChildByName('ToastMessage');
 
-    const toast = new Node('ToastMessage');
-    popupRoot.addChild(toast);
-    toast.layer = popupRoot.layer;
-    toast.setPosition(new Vec3(0, -418, 5));
-    toast.addComponent(UITransform).setContentSize(420, 56);
-    const graphics = toast.addComponent(Graphics);
-    this.drawPanel(graphics, 420, 56, new Color(255, 247, 218, 246), new Color(112, 86, 58, 255));
-    this.createTextNode(toast, 'ToastMessageText', message, 0, -7, 20, new Color(66, 52, 38, 255), 380);
+    ShopUiRenderer.createToast(popupRoot, message);
 
     this.scheduleOnce(() => {
       if (token !== this.toastSequenceToken) {
@@ -1741,23 +1742,7 @@ export class MvpGameController extends Component {
   }
 
   private createTextNode(parent: Node, nodeName: string, text: string, x: number, y: number, fontSize: number, color: Color, width: number): Node {
-    let node = this.getValidChildByName(parent, nodeName);
-    if (!node) {
-      node = new Node(nodeName);
-      parent.addChild(node);
-      node.addComponent(UITransform);
-      node.addComponent(Label);
-    }
-
-    node.layer = parent.layer;
-    node.setPosition(new Vec3(x, y, 1));
-    node.getComponent(UITransform)?.setContentSize(width, 48);
-    const label = node.getComponent(Label) ?? node.addComponent(Label);
-    label.string = text;
-    label.fontSize = fontSize;
-    label.lineHeight = fontSize + 8;
-    label.color = color;
-    return node;
+    return ShopUiRenderer.createTextNode(parent, nodeName, text, x, y, fontSize, color, width);
   }
 
   private createButton(
@@ -1773,23 +1758,7 @@ export class MvpGameController extends Component {
     onClick: () => void,
     fontSize = 22
   ): Node {
-    const node = new Node(nodeName);
-    parent.addChild(node);
-    node.layer = parent.layer;
-    node.setPosition(new Vec3(x, y, 2));
-    node.addComponent(UITransform).setContentSize(width, height);
-    const graphics = node.addComponent(Graphics);
-    this.drawPanel(graphics, width, height, fill, stroke);
-    const labelNode = this.createTextNode(node, `${nodeName}_Text`, text, 0, 0, fontSize, new Color(44, 48, 42, 255), width - 12);
-    labelNode.setPosition(new Vec3(0, -fontSize * 0.35, 3));
-    node.on(Node.EventType.TOUCH_START, stopPropagation);
-    node.on(Node.EventType.TOUCH_MOVE, stopPropagation);
-    node.on(Node.EventType.TOUCH_CANCEL, stopPropagation);
-    node.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
-      stopPropagation(event);
-      onClick();
-    });
-    return node;
+    return ShopUiRenderer.createButton(parent, nodeName, text, x, y, width, height, fill, stroke, onClick, fontSize);
   }
 
   private drawStonePreview(graphics: Graphics, jade: JadePieceData): void {
@@ -1802,21 +1771,11 @@ export class MvpGameController extends Component {
   }
 
   private drawStageBackground(graphics: Graphics): void {
-    graphics.clear();
-    graphics.fillColor = new Color(157, 145, 136, 255);
-    graphics.rect(-PORTRAIT_WIDTH * 0.5, -PORTRAIT_HEIGHT * 0.5, PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
-    graphics.fill();
+    ShopUiRenderer.drawStageBackground(graphics);
   }
 
-  private drawPanel(graphics: Graphics, width: number, height: number, fill: Color, stroke: Color, offset?: Vec2Data): void {
-    const x = offset?.x ?? 0;
-    const y = offset?.y ?? 0;
-    graphics.fillColor = fill;
-    graphics.strokeColor = stroke;
-    graphics.lineWidth = 3;
-    graphics.rect(x - width * 0.5, y - height * 0.5, width, height);
-    graphics.fill();
-    graphics.stroke();
+  private drawPanel(graphics: Graphics, width: number, height: number, fill: Color, stroke: Color, offset?: { x: number; y: number }): void {
+    ShopUiRenderer.drawPanel(graphics, width, height, fill, stroke, offset);
   }
 
   private getGraphicsForNode(parent: Node, nodeName: string): Graphics {
