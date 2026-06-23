@@ -90,12 +90,19 @@
     "collectorPurchaseMessage": "{customer}看中了高品质 {name}，金币 +{price}",
     "colorHunterPurchaseMessage": "{customer}买走了颜色讨喜的 {name}，金币 +{price}",
     "casualVisitorPurchaseMessage": "{customer}买走了顺眼的 {name}，金币 +{price}",
+    "colorPreferenceReason": "看中颜色：{color}",
+    "stylePreferenceReason": "看中款式：{name}",
+    "qualityPreferenceReason": "看中品质：{quality}",
+    "budgetPreferenceReason": "价格合适：{price}",
+    "casualPreferenceReason": "顺眼就买",
     "defaultCustomerDisplayName": "普通顾客",
     "customerLeftMessage": "{customer} 看看离开",
     "salesFinishedMessage": "今日售卖结束",
     "salesSoldOutMessage": "商品已售罄，剩余顾客离开",
     "commercialPlaceholderTitle": "商业化预留",
     "placeholderNotice": "占位，不接入广告或支付",
-    "multiColorTag": "\u591a\u8272"
+    "multiColorTag": "\u591a\u8272",
+    "colorfulTestStoneProfileName": "\u591a\u8272\u6d4b\u8bd5\u6599",
+    "colorfulTestStoneMaterialName": "\u7ec6\u817b\u6d4b\u8bd5\u6599"
   }
 }

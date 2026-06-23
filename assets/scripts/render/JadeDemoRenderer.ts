@@ -216,10 +216,10 @@ export class JadeDemoRenderer extends Component {
 
       for (let index = 0; index < samples.length; index += step) {
         const sample = samples[index];
-        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(0.85, sample.concentration) * 0.72);
-        const radius = Math.max(2.5, jade.sampleCellSize * (0.42 + sample.concentration * 0.36));
+        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(1, sample.concentration * 1.12) * 0.98);
+        const radius = Math.max(2.7, jade.sampleCellSize * (0.48 + sample.concentration * 0.42));
         graphics.circle(sample.x, sample.y, radius);
-        graphics.fillColor = parseHexColor(region.displayColor, alpha);
+        graphics.fillColor = parseHexColor(region.displayColor || '#ff00ff', alpha);
         graphics.fill();
       }
     }
@@ -251,10 +251,10 @@ export class JadeDemoRenderer extends Component {
       graphics.fill();
 
       if (sample.colorId && sample.concentration > 0.04) {
-        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(0.9, sample.concentration) * 0.8);
-        const radius = colorRadius * (1 + sample.concentration * 0.18);
+        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(1, sample.concentration * 1.14) * 1.05);
+        const radius = colorRadius * (1.06 + sample.concentration * 0.28);
         graphics.circle(sample.x, sample.y, radius);
-        graphics.fillColor = parseHexColor(colorById.get(sample.colorId) ?? '#ffffff', alpha);
+        graphics.fillColor = parseHexColor(colorById.get(sample.colorId) ?? '#ff00ff', alpha);
         graphics.fill();
       }
 
@@ -273,7 +273,7 @@ export class JadeDemoRenderer extends Component {
 
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
-      const color = sample.colorId ? colorById.get(sample.colorId) ?? '#ffffff' : '#ffffff';
+      const color = sample.colorId ? colorById.get(sample.colorId) ?? '#ff00ff' : '#ffffff';
       graphics.circle(sample.x, sample.y, 0.9);
       const configuredAlpha = Math.round(255 * (demoLevelConfig.sampleGrid.debugSampleAlpha ?? 0.16));
       graphics.fillColor = parseHexColor(color, sample.colorId ? configuredAlpha : Math.round(configuredAlpha * 0.22));

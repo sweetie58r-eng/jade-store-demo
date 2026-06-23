@@ -2,11 +2,12 @@ import { Color, Component, EventTouch, Graphics, Label, Mask, Node, UITransform,
 
 import { CustomerTypeConfig, LoadedGameConfigs } from '../config/GameConfigTypes';
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
+import { getBounds } from '../core/geometry/Polygon2D';
 import { JadeGenerator } from '../core/generator/JadeGenerator';
 import { SeededRandom } from '../core/random/SeededRandom';
 import { MarketStoneData, ProcessingJobData, DailySalesResult, EstimatedProductData, FinishedProductData, ProductColorSummaryData, ProductStatus } from '../data/BusinessTypes';
 import { PlacedCarvingData } from '../data/CarvingTypes';
-import { JadePieceData, Vec2Data } from '../data/JadeTypes';
+import { ColorRegionData, JadePieceData, SamplePointData, Vec2Data } from '../data/JadeTypes';
 import { LayoutSettlementResult } from '../data/SettlementTypes';
 import { JadeDemoRenderer } from '../render/JadeDemoRenderer';
 import { CarvingLayoutController } from './CarvingLayoutController';
@@ -33,6 +34,7 @@ const { ccclass } = _decorator;
 const SALES_EVENT_INTERVAL_SECONDS = 0.62;
 const PROCESSING_ANIMATION_SECONDS = 1.35;
 const DEFAULT_SHELF_SLOT_COUNT = 6;
+const INTERESTING_COLOR_IDS = new Set(['yellow', 'red', 'purple', 'ink', 'mixed', 'vivid_green', 'deep_green']);
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
@@ -43,6 +45,7 @@ interface SalesEventData {
   customerTypeId: string;
   customerDisplayName: string;
   customerMessageKey: string;
+  purchaseReason: string;
   productId: string | null;
   purchased: boolean;
 }
@@ -219,6 +222,7 @@ export class MvpGameController extends Component {
     const renderer = this.jadeLayer.getComponent(JadeDemoRenderer) ?? this.jadeLayer.addComponent(JadeDemoRenderer);
     renderer.graphics = this.jadeLayer.getComponent(Graphics);
     renderer.seedLabel = this.debugLabel;
+    this.logCurrentDisplayedJadeColors(stone);
 
     const revealController = this.jadeLayer.getComponent(JadeRevealController) ?? this.jadeLayer.addComponent(JadeRevealController);
     revealController.initialize(stone.jade, this.configs.jade, this.configs.color, this.configs.demoLevel, this.configs.settlement, this.configs.text, renderer, () => {
@@ -482,6 +486,7 @@ export class MvpGameController extends Component {
         customerTypeId: customerType.id,
         customerDisplayName: customerType.displayName,
         customerMessageKey: customerType.messageKey,
+        purchaseReason: this.createCustomerPurchaseReason(product, customerType),
         productId: product.id,
         purchased: true
       });
@@ -779,7 +784,7 @@ export class MvpGameController extends Component {
       base: new Color(200, 218, 195, 255)
     };
 
-    return colorMap[colorId] ?? new Color(200, 218, 195, 255);
+    return colorMap[colorId] ?? new Color(255, 0, 255, 255);
   }
 
   private pickProductForCustomer(products: FinishedProductData[], random: SeededRandom): FinishedProductData {
@@ -832,6 +837,41 @@ export class MvpGameController extends Component {
     }
 
     return bestProduct;
+  }
+
+  private createCustomerPurchaseReason(product: FinishedProductData, customer: CustomerTypeConfig): string {
+    const matchedColor = this.getMatchedPreferredColorName(product.colorSummary, customer.preferredColorIds);
+    if (matchedColor) {
+      return this.getText('colorPreferenceReason').replace('{color}', matchedColor);
+    }
+
+    if (customer.preferredStyleIds.includes(product.styleId)) {
+      return this.getText('stylePreferenceReason').replace('{name}', product.displayName);
+    }
+
+    if (customer.qualitySensitivity >= 1.25) {
+      return this.getText('qualityPreferenceReason').replace('{quality}', this.getMaterialQualityDisplayName(product.materialQualityId));
+    }
+
+    const [budgetMin, budgetMax] = customer.budgetRange;
+    if (product.listedPrice >= budgetMin && product.listedPrice <= budgetMax) {
+      return this.getText('budgetPreferenceReason').replace('{price}', `${product.listedPrice}`);
+    }
+
+    return this.getText('casualPreferenceReason');
+  }
+
+  private getMatchedPreferredColorName(colorSummary: ProductColorSummaryData, preferredColorIds: string[]): string {
+    if (preferredColorIds.length === 0) {
+      return '';
+    }
+
+    if (colorSummary.isMultiColor && preferredColorIds.includes('mixed')) {
+      return this.getText('multiColorTag');
+    }
+
+    const matchedColor = colorSummary.colors.find((color) => preferredColorIds.includes(color.colorId));
+    return matchedColor ? this.getColorDisplayName(matchedColor.colorId) : '';
   }
 
   private calculateCustomerProductScore(product: FinishedProductData, customer: CustomerTypeConfig, random: SeededRandom): number {
@@ -963,10 +1003,11 @@ export class MvpGameController extends Component {
       session.soldProductIds.push(product.id);
       this.coins += product.finalSellPrice;
       const purchaseTemplate = this.getText(event.customerMessageKey);
-      session.message = purchaseTemplate
+      const purchaseMessage = purchaseTemplate
         .replace('{customer}', event.customerDisplayName)
         .replace('{name}', product.displayName)
         .replace('{price}', `${product.finalSellPrice}`);
+      session.message = event.purchaseReason ? `${purchaseMessage}\n${event.purchaseReason}` : purchaseMessage;
     } else {
       session.message = this.getText('customerLeftMessage')
         .replace('{index}', `${customerNumber}`)
@@ -1140,7 +1181,7 @@ export class MvpGameController extends Component {
     const baseContentY = WAREHOUSE_VIEW_HEIGHT * 0.5;
     const maxScrollY = Math.max(0, contentHeight - WAREHOUSE_VIEW_HEIGHT);
     content.setPosition(new Vec3(0, baseContentY, 1));
-    scrollNode.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
+    const handleScrollMove = (event: EventTouch) => {
       stopPropagation(event);
       if (maxScrollY <= 0 || !content.isValid) {
         return;
@@ -1148,9 +1189,14 @@ export class MvpGameController extends Component {
 
       const delta = event.getUIDelta();
       const currentPosition = content.position;
-      const nextY = clamp(currentPosition.y + delta.y, baseContentY, baseContentY + maxScrollY);
+      const nextY = clamp(currentPosition.y - delta.y, baseContentY, baseContentY + maxScrollY);
       content.setPosition(new Vec3(currentPosition.x, nextY, currentPosition.z));
-    });
+    };
+    scrollNode.on(Node.EventType.TOUCH_MOVE, handleScrollMove);
+    content.on(Node.EventType.TOUCH_START, stopPropagation);
+    content.on(Node.EventType.TOUCH_MOVE, handleScrollMove);
+    content.on(Node.EventType.TOUCH_END, stopPropagation);
+    content.on(Node.EventType.TOUCH_CANCEL, stopPropagation);
 
     const columnX = [-218, 0, 218];
     products.forEach((product, index) => {
@@ -1158,7 +1204,7 @@ export class MvpGameController extends Component {
       const row = Math.floor(index / WAREHOUSE_COLUMNS);
       const x = columnX[column];
       const y = -72 - row * WAREHOUSE_ROW_GAP;
-      this.createWarehouseProductCard(content, product, x, y);
+      this.createWarehouseProductCard(content, product, x, y, handleScrollMove);
     });
   }
 
@@ -1203,13 +1249,16 @@ export class MvpGameController extends Component {
     }
   }
 
-  private createWarehouseProductCard(parent: Node, product: FinishedProductData, x: number, y: number): void {
+  private createWarehouseProductCard(parent: Node, product: FinishedProductData, x: number, y: number, onScrollMove?: (event: EventTouch) => void): void {
     const card = new Node(`WarehouseProductCard_${product.id}`);
     parent.addChild(card);
     card.layer = parent.layer;
     card.setPosition(new Vec3(x, y, 2));
     card.addComponent(UITransform).setContentSize(WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT);
     this.swallowTouches(card);
+    if (onScrollMove) {
+      card.on(Node.EventType.TOUCH_MOVE, onScrollMove);
+    }
     const graphics = card.addComponent(Graphics);
     const borderColor = product.status === 'sold' ? new Color(112, 112, 112, 255) : product.status === 'on_shelf' ? new Color(62, 126, 72, 255) : new Color(102, 78, 55, 255);
     this.drawPanel(graphics, WAREHOUSE_CARD_WIDTH, WAREHOUSE_CARD_HEIGHT, new Color(255, 252, 238, 248), borderColor);
@@ -1419,7 +1468,7 @@ export class MvpGameController extends Component {
           seed
         }
       };
-      const rawJade = new JadeGenerator().generate(seededConfigs);
+      const rawJade = this.createMarketRawJade(seededConfigs, index);
       const workJade = fitJadeToViewport(rawJade, {
         targetWidth: JADE_WORK_AREA.width,
         targetHeight: JADE_WORK_AREA.height,
@@ -1448,6 +1497,120 @@ export class MvpGameController extends Component {
 
     this.marketStones = nextMarket;
     this.logMarketGenerationStats(nextMarket);
+  }
+
+  private createMarketRawJade(seededConfigs: LoadedGameConfigs, index: number): JadePieceData {
+    const generatedJade = new JadeGenerator().generate(seededConfigs);
+    if (seededConfigs.demoLevel.debug.forceColorfulTestStone === true && index === 0) {
+      return this.applyColorfulTestRegions(generatedJade);
+    }
+
+    return generatedJade;
+  }
+
+  private applyColorfulTestRegions(jade: JadePieceData): JadePieceData {
+    const colorIds = ['green', 'yellow', 'purple', 'red', 'ink'];
+    const colorById = new Map(this.configs?.color.colors.map((color) => [color.id, color]));
+    const bounds = getBounds(jade.outlinePolygon);
+    const width = Math.max(1, bounds.maxX - bounds.minX);
+    const height = Math.max(1, bounds.maxY - bounds.minY);
+    const placements = [
+      { colorId: 'green', x: 0.3, y: 0.65, rotation: 0.2 },
+      { colorId: 'yellow', x: 0.64, y: 0.68, rotation: -0.45 },
+      { colorId: 'purple', x: 0.34, y: 0.36, rotation: 0.55 },
+      { colorId: 'red', x: 0.68, y: 0.36, rotation: -0.1 },
+      { colorId: 'ink', x: 0.5, y: 0.5, rotation: 0.95 }
+    ];
+
+    const regions: ColorRegionData[] = placements.map((placement, index) => {
+      const color = colorById.get(placement.colorId);
+      const target = {
+        x: bounds.minX + width * placement.x,
+        y: bounds.minY + height * placement.y
+      };
+      const center = this.findNearestSamplePoint(jade.sampleGrid, target);
+
+      return {
+        id: `colorful_test_region_${index}`,
+        colorId: placement.colorId,
+        center,
+        radiusX: width * (placement.colorId === 'ink' ? 0.18 : 0.22),
+        radiusY: height * (placement.colorId === 'ink' ? 0.16 : 0.2),
+        rotation: placement.rotation,
+        concentrationPeak: color ? Math.max(0.72, color.concentrationRange[1] * 0.92) : 0.86,
+        valueMultiplier: color?.valueMultiplier ?? 1,
+        displayColor: color?.displayColor ?? '#ff00ff'
+      };
+    });
+    const sampleGrid = jade.sampleGrid.map((sample) => this.createColorfulTestSample(sample, regions));
+    const visibleColorIds = this.getVisibleJadeColorIds({ sampleGrid });
+
+    console.log(
+      [
+        '[MvpGameController] forced colorful test stone',
+        `stoneId=${jade.id}`,
+        `requestedColors=${colorIds.join(',')}`,
+        `visibleColors=${visibleColorIds.join(',') || 'none'}`,
+        `regionCount=${regions.length}`
+      ].join(' | ')
+    );
+
+    return {
+      ...jade,
+      id: `${jade.id}_colorful_test`,
+      qualityProfileId: 'premium',
+      qualityProfileDisplayName: this.getText('colorfulTestStoneProfileName'),
+      materialQualityId: 'fine',
+      materialQualityDisplayName: this.getText('colorfulTestStoneMaterialName'),
+      materialQualityFactor: Math.max(jade.materialQualityFactor, 0.95),
+      colorRichness: Math.max(jade.colorRichness, 1.8),
+      colorRegions: regions,
+      sampleGrid
+    };
+  }
+
+  private findNearestSamplePoint(samples: SamplePointData[], target: Vec2Data): Vec2Data {
+    let nearest = samples[0];
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const sample of samples) {
+      const distance = (sample.x - target.x) ** 2 + (sample.y - target.y) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        nearest = sample;
+      }
+    }
+
+    return nearest ? { x: nearest.x, y: nearest.y } : target;
+  }
+
+  private createColorfulTestSample(sample: SamplePointData, regions: ColorRegionData[]): SamplePointData {
+    let bestRegion: ColorRegionData | null = null;
+    let bestConcentration = 0;
+
+    for (const region of regions) {
+      const concentration = getColorRegionConcentration(sample, region);
+      if (concentration > bestConcentration) {
+        bestConcentration = concentration;
+        bestRegion = region;
+      }
+    }
+
+    if (!bestRegion || bestConcentration < 0.035) {
+      return {
+        x: sample.x,
+        y: sample.y,
+        concentration: 0
+      };
+    }
+
+    return {
+      x: sample.x,
+      y: sample.y,
+      colorRegionId: bestRegion.id,
+      colorId: bestRegion.colorId,
+      concentration: bestConcentration
+    };
   }
 
   private pickMarketStoneSeed(index: number): number {
@@ -1479,7 +1642,9 @@ export class MvpGameController extends Component {
     const protectionDays = configs.demoLevel.economy.newPlayerProtectionDays ?? 0;
     const guaranteedCount = configs.demoLevel.economy.guaranteedPlayableStonePerDay ?? 0;
     if (this.day <= protectionDays && index < guaranteedCount) {
-      for (let attempt = 0; attempt < 14; attempt += 1) {
+      let fallbackSeed = baseSeed;
+      let interestingFallbackSeed: number | null = null;
+      for (let attempt = 0; attempt < 36; attempt += 1) {
         const seed = baseSeed + attempt * 307;
         const seededConfigs: LoadedGameConfigs = {
           ...configs,
@@ -1490,12 +1655,25 @@ export class MvpGameController extends Component {
         };
         const testJade = new JadeGenerator().generate(seededConfigs);
         const deepCount = testJade.cracks.filter((crack) => crack.type === 'deep').length;
-        const hasUsefulColor = testJade.sampleGrid.some((sample) => sample.colorId && sample.concentration >= 0.5);
+        const visibleColorIds = this.getVisibleJadeColorIds(testJade);
+        const hasRareOrSpecialColor = visibleColorIds.some((colorId) => INTERESTING_COLOR_IDS.has(colorId));
+        const hasInterestingColor = visibleColorIds.length >= 2 || hasRareOrSpecialColor;
+        const hasUsefulColor = hasInterestingColor || testJade.sampleGrid.some((sample) => sample.colorId && sample.concentration >= 0.58);
         const playableProfile = testJade.qualityProfileId === 'normal' || testJade.qualityProfileId === 'good' || testJade.qualityProfileId === 'premium';
         if (playableProfile && deepCount <= 1 && (hasUsefulColor || testJade.materialQualityFactor >= 0.75)) {
+          fallbackSeed = seed;
+        }
+
+        if (playableProfile && deepCount <= 1 && hasInterestingColor && interestingFallbackSeed === null) {
+          interestingFallbackSeed = seed;
+        }
+
+        if (playableProfile && deepCount <= 1 && hasRareOrSpecialColor) {
           return seed;
         }
       }
+
+      return interestingFallbackSeed ?? fallbackSeed;
     }
 
     return baseSeed;
@@ -1629,6 +1807,39 @@ export class MvpGameController extends Component {
     }
 
     console.log(`[MvpGameController] color generation debug samples\n${samples.join('\n')}`);
+  }
+
+  private logCurrentDisplayedJadeColors(stone: MarketStoneData): void {
+    if (!this.configs) {
+      return;
+    }
+
+    const jade = stone.jade;
+    const regionColorIds = [...new Set(jade.colorRegions.map((region) => region.colorId))];
+    const sampleColorIds = this.getVisibleJadeColorIds(jade);
+    const allColorIds = [...new Set([...regionColorIds, ...sampleColorIds])];
+    const rendererColorById = new Map(this.configs.color.colors.map((color) => [color.id, color.displayColor]));
+    const rendererUsedColorIds = allColorIds.filter((colorId) => rendererColorById.has(colorId));
+    const missingRendererColorIds = allColorIds.filter((colorId) => !rendererColorById.has(colorId));
+
+    console.log(
+      [
+        '[MvpGameController] current reveal jade colors',
+        `currentStoneId=${stone.id}`,
+        `jadeId=${jade.id}`,
+        `colorRegionCount=${jade.colorRegions.length}`,
+        `colorRegion colors=${regionColorIds.join(',') || 'none'}`,
+        `sampleVisibleColors=${sampleColorIds.join(',') || 'base'}`,
+        `mainColor=${this.getMainJadeColorId(jade)}`,
+        `allColorIds=${allColorIds.join(',') || 'base'}`,
+        `rendererUsedColorIds=${rendererUsedColorIds.join(',') || 'none'}`,
+        `missingRendererColorIds=${missingRendererColorIds.join(',') || 'none'}`
+      ].join(' | ')
+    );
+
+    if (missingRendererColorIds.length > 0) {
+      console.warn(`[MvpGameController] missing renderer color mapping: ${missingRendererColorIds.join(',')}`);
+    }
   }
 
   private getVisibleJadeColorIds(jade: { sampleGrid: { colorId?: string; concentration: number }[] }): string[] {
@@ -2097,6 +2308,22 @@ function drawPolygon(graphics: Graphics, points: Vec2Data[]): void {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function getColorRegionConcentration(point: Vec2Data, region: ColorRegionData): number {
+  const cos = Math.cos(-region.rotation);
+  const sin = Math.sin(-region.rotation);
+  const dx = point.x - region.center.x;
+  const dy = point.y - region.center.y;
+  const localX = dx * cos - dy * sin;
+  const localY = dx * sin + dy * cos;
+  const normalized = (localX * localX) / (region.radiusX * region.radiusX) + (localY * localY) / (region.radiusY * region.radiusY);
+
+  if (normalized > 1) {
+    return 0;
+  }
+
+  return Math.pow(1 - normalized, 1.35) * region.concentrationPeak;
 }
 
 function formatCountMap(counts: Map<string, number>): string {

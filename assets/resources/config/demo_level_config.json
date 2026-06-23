@@ -26,7 +26,7 @@
     "completeTransitionDelay": 0.5
   },
   "economy": {
-    "initialCoins": 6000,
+    "initialCoins": 50000,
     "marketStoneCountRange": [4, 6],
     "initialShelfSlotCount": 6,
     "dailyCustomerCount": 5,
@@ -184,6 +184,7 @@
     "forceDeepCrackTestStone": false,
     "crackTestMode": false,
     "debugForceDeepCrack": false,
-    "showColorGenerationDebug": true
+    "showColorGenerationDebug": true,
+    "forceColorfulTestStone": true
   }
 }

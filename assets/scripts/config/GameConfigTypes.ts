@@ -67,6 +67,7 @@ export interface DemoLevelConfig {
     crackTestMode?: boolean;
     debugForceDeepCrack?: boolean;
     showColorGenerationDebug?: boolean;
+    forceColorfulTestStone?: boolean;
   };
 }
 
