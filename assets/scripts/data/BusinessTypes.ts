@@ -10,12 +10,23 @@ export interface MarketStoneData {
   isPurchased: boolean;
 }
 
+export interface ProductColorCoverageData {
+  colorId: string;
+  ratio: number;
+}
+
+export interface ProductColorSummaryData {
+  mainColorId: string;
+  colors: ProductColorCoverageData[];
+  isMultiColor: boolean;
+}
+
 export interface EstimatedProductData {
   carvingId: string;
   styleId: string;
   displayName: string;
   estimatedPrice: number;
-  colorSummary: string;
+  colorSummary: ProductColorSummaryData;
   crackPenalty: number;
 }
 
@@ -40,7 +51,7 @@ export interface FinishedProductData {
   status: ProductStatus;
   sourceStoneId: string;
   materialQualityId: string;
-  colorSummary: string;
+  colorSummary: ProductColorSummaryData;
   crackPenalty: number;
   createdDay: number;
   soldDay: number | null;

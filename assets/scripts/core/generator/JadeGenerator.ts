@@ -1,4 +1,4 @@
-import { LoadedGameConfigs } from '../../config/GameConfigTypes';
+import { ColorDefinitionConfig, LoadedGameConfigs } from '../../config/GameConfigTypes';
 import { ColorRegionData, CrackData, CrackType, JadePieceData, SamplePointData, Vec2Data } from '../../data/JadeTypes';
 import { getBounds, pointInPolygon, polygonArea, smoothClosedPolygon } from '../geometry/Polygon2D';
 import { SeededRandom } from '../random/SeededRandom';
@@ -124,10 +124,11 @@ export class JadeGenerator {
     const bounds = getBounds(outlinePolygon);
     const extraRegionChance = clamp((colorRichness - 1) * 0.45, 0, 0.45);
     const regionCount = Math.max(1, random.int(regionCountRange[0], regionCountRange[1]) + (random.chance(extraRegionChance) ? 1 : 0));
+    const colorPalette = this.pickColorPalette(configs, random, colorRichness, regionCount);
     const regions: ColorRegionData[] = [];
 
     for (let index = 0; index < regionCount; index += 1) {
-      const color = this.pickColorByRichness(configs, random, colorRichness);
+      const color = colorPalette[index % colorPalette.length] ?? this.pickColorByRichness(configs, random, colorRichness);
       const center = this.pickPointInside(random, bounds, outlinePolygon);
       const radiusScale = random.range(color.radiusScaleRange[0], color.radiusScaleRange[1]) * clamp(0.78 + colorRichness * 0.22, 0.72, 1.2);
       const concentrationPeak = clamp(
@@ -153,8 +154,25 @@ export class JadeGenerator {
     return regions;
   }
 
-  private pickColorByRichness(configs: LoadedGameConfigs, random: SeededRandom, colorRichness: number) {
-    const weightedColors = configs.color.colors.map((color) => {
+  private pickColorPalette(configs: LoadedGameConfigs, random: SeededRandom, colorRichness: number, regionCount: number): ColorDefinitionConfig[] {
+    const weights = configs.color.regionColorCountWeights?.length > 0 ? configs.color.regionColorCountWeights : [{ count: 1, probability: 1 }];
+    const targetColorCount = clamp(random.pickWeighted(weights).count, 1, Math.max(1, Math.min(regionCount, configs.color.colors.length)));
+    const palette: ColorDefinitionConfig[] = [];
+    const usedColorIds = new Set<string>();
+
+    for (let index = 0; index < targetColorCount; index += 1) {
+      const color = this.pickColorByRichness(configs, random, colorRichness, usedColorIds);
+      palette.push(color);
+      usedColorIds.add(color.id);
+    }
+
+    return palette;
+  }
+
+  private pickColorByRichness(configs: LoadedGameConfigs, random: SeededRandom, colorRichness: number, excludedColorIds?: Set<string>): ColorDefinitionConfig {
+    const availableColors = configs.color.colors.filter((color) => !excludedColorIds?.has(color.id));
+    const colorPool = availableColors.length > 0 ? availableColors : configs.color.colors;
+    const weightedColors = colorPool.map((color) => {
       const valueBias = Math.pow(Math.max(0.25, color.valueMultiplier), colorRichness - 0.8);
       return {
         ...color,

@@ -183,6 +183,7 @@
     "showCrackHitDebug": false,
     "forceDeepCrackTestStone": false,
     "crackTestMode": false,
-    "debugForceDeepCrack": false
+    "debugForceDeepCrack": false,
+    "showColorGenerationDebug": true
   }
 }

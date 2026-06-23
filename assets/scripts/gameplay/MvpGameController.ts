@@ -4,7 +4,7 @@ import { CustomerTypeConfig, LoadedGameConfigs } from '../config/GameConfigTypes
 import { fitJadeToViewport } from '../core/geometry/JadeViewportFitter';
 import { JadeGenerator } from '../core/generator/JadeGenerator';
 import { SeededRandom } from '../core/random/SeededRandom';
-import { MarketStoneData, ProcessingJobData, DailySalesResult, EstimatedProductData, FinishedProductData, ProductStatus } from '../data/BusinessTypes';
+import { MarketStoneData, ProcessingJobData, DailySalesResult, EstimatedProductData, FinishedProductData, ProductColorSummaryData, ProductStatus } from '../data/BusinessTypes';
 import { PlacedCarvingData } from '../data/CarvingTypes';
 import { JadePieceData, Vec2Data } from '../data/JadeTypes';
 import { LayoutSettlementResult } from '../data/SettlementTypes';
@@ -729,6 +729,8 @@ export class MvpGameController extends Component {
       graphics.fill();
       graphics.stroke();
     }
+
+    this.drawProductColorDots(graphics, product.colorSummary, -28, -30, 7);
   }
 
   private createProductStatusTag(card: Node, product: FinishedProductData, status: ProductSaleStatus): void {
@@ -757,7 +759,11 @@ export class MvpGameController extends Component {
     }
   }
 
-  private getProductIconColor(colorSummary: string): Color {
+  private getProductIconColor(colorSummary: ProductColorSummaryData): Color {
+    return this.getColorById(colorSummary.mainColorId);
+  }
+
+  private getColorById(colorId: string): Color {
     const colorMap: Record<string, Color> = {
       white: new Color(230, 228, 208, 255),
       gray_white: new Color(188, 194, 184, 255),
@@ -769,10 +775,11 @@ export class MvpGameController extends Component {
       red: new Color(180, 74, 63, 255),
       purple: new Color(146, 101, 181, 255),
       ink: new Color(36, 49, 45, 255),
-      mixed: new Color(104, 169, 176, 255)
+      mixed: new Color(104, 169, 176, 255),
+      base: new Color(200, 218, 195, 255)
     };
 
-    return colorMap[colorSummary] ?? new Color(200, 218, 195, 255);
+    return colorMap[colorId] ?? new Color(200, 218, 195, 255);
   }
 
   private pickProductForCustomer(products: FinishedProductData[], random: SeededRandom): FinishedProductData {
@@ -832,7 +839,7 @@ export class MvpGameController extends Component {
     const price = Math.max(1, product.listedPrice);
     const materialScore = this.getMaterialQualityScore(product.materialQualityId);
     const styleMatchBonus = customer.preferredStyleIds.includes(product.styleId) ? 3.2 : 0;
-    const colorMatchBonus = customer.preferredColorIds.includes(product.colorSummary) ? 3.4 : 0;
+    const colorMatchBonus = this.hasPreferredProductColor(product.colorSummary, customer.preferredColorIds) ? 3.4 : 0;
     const qualityScore = materialScore * customer.qualitySensitivity * 2.2;
     const priceFitScore = this.calculatePriceFitScore(price, budgetMin, budgetMax, customer.priceSensitivity);
     const crackPenaltyScore = (product.crackPenalty / 100) * (1.5 - customer.crackTolerance) * 3.6;
@@ -840,6 +847,18 @@ export class MvpGameController extends Component {
     const randomNoise = random.range(-0.35, 0.35);
 
     return 1 + styleMatchBonus + colorMatchBonus + qualityScore + priceFitScore + valueScore - crackPenaltyScore + randomNoise;
+  }
+
+  private hasPreferredProductColor(colorSummary: ProductColorSummaryData, preferredColorIds: string[]): boolean {
+    if (preferredColorIds.length === 0) {
+      return false;
+    }
+
+    if (colorSummary.isMultiColor && preferredColorIds.includes('mixed')) {
+      return true;
+    }
+
+    return colorSummary.colors.some((color) => preferredColorIds.includes(color.colorId));
   }
 
   private calculatePriceFitScore(price: number, budgetMin: number, budgetMax: number, priceSensitivity: number): number {
@@ -1219,6 +1238,7 @@ export class MvpGameController extends Component {
     graphics.circle(-68, -8, 12);
     graphics.fill();
     graphics.stroke();
+    this.drawProductColorDots(graphics, product.colorSummary, -88, -30, 4);
   }
 
   private drawInventoryPreviewIcon(graphics: Graphics, product: FinishedProductData): void {
@@ -1229,6 +1249,20 @@ export class MvpGameController extends Component {
     graphics.circle(-64, 45, 14);
     graphics.fill();
     graphics.stroke();
+    this.drawProductColorDots(graphics, product.colorSummary, -84, 19, 5);
+  }
+
+  private drawProductColorDots(graphics: Graphics, colorSummary: ProductColorSummaryData, startX: number, y: number, radius: number): void {
+    const visibleColors = colorSummary.colors.slice(0, 3);
+    visibleColors.forEach((entry, index) => {
+      const color = this.getColorById(entry.colorId);
+      graphics.fillColor = new Color(color.r, color.g, color.b, 235);
+      graphics.strokeColor = new Color(45, 76, 62, 210);
+      graphics.lineWidth = 1.5;
+      graphics.circle(startX + index * radius * 2.5, y, radius);
+      graphics.fill();
+      graphics.stroke();
+    });
   }
 
   private createEmptyShelfSlotCard(parent: Node, slotIndex: number, x: number, y: number): void {
@@ -1486,6 +1520,8 @@ export class MvpGameController extends Component {
     const qualityCounts = new Map<string, number>();
     const crackProfileCounts = new Map<string, number>();
     const materialCounts = new Map<string, number>();
+    const colorCounts = new Map<string, number>();
+    const colorRegionCountCounts = new Map<string, number>();
     let deepCrackCount = 0;
     let shallowCrackCount = 0;
     let cleanStoneCount = 0;
@@ -1501,6 +1537,11 @@ export class MvpGameController extends Component {
       qualityCounts.set(jade.qualityProfileId, (qualityCounts.get(jade.qualityProfileId) ?? 0) + 1);
       crackProfileCounts.set(jade.crackProfileId, (crackProfileCounts.get(jade.crackProfileId) ?? 0) + 1);
       materialCounts.set(jade.materialQualityId, (materialCounts.get(jade.materialQualityId) ?? 0) + 1);
+      const visibleColorIds = this.getVisibleJadeColorIds(jade);
+      colorRegionCountCounts.set(`${visibleColorIds.length}`, (colorRegionCountCounts.get(`${visibleColorIds.length}`) ?? 0) + 1);
+      for (const colorId of visibleColorIds) {
+        colorCounts.set(colorId, (colorCounts.get(colorId) ?? 0) + 1);
+      }
       const deepCount = jade.cracks.filter((crack) => crack.type === 'deep').length;
       const shallowCount = jade.cracks.filter((crack) => crack.type === 'shallow').length;
       deepCrackCount += deepCount;
@@ -1532,10 +1573,79 @@ export class MvpGameController extends Component {
         `shallow only count=${shallowOnlyCount}`,
         `shallow + deep count=${shallowAndDeepCount}`,
         `materialQuality count=${formatCountMap(materialCounts)}`,
+        `visibleColorCount count=${formatCountMap(colorRegionCountCounts)}`,
+        `visibleColor count=${formatCountMap(colorCounts)}`,
         `colorRichness average=${(colorRichnessSum / stones.length).toFixed(2)}`,
         `price range=${Math.round(minPrice)}-${Math.round(maxPrice)}`
       ].join(' | ')
     );
+
+    for (const stone of stones) {
+      const jade = stone.jade;
+      const visibleColorIds = this.getVisibleJadeColorIds(jade);
+      console.log(
+        [
+          '[MvpGameController] market color sample',
+          `stoneId=${stone.id}`,
+          `colorRegionCount=${jade.colorRegions.length}`,
+          `colors=${visibleColorIds.join(',') || 'base'}`,
+          `mainColor=${this.getMainJadeColorId(jade)}`,
+          `hasMultipleColors=${visibleColorIds.length > 1}`
+        ].join(' | ')
+      );
+    }
+
+    if (this.configs?.demoLevel.debug.showColorGenerationDebug) {
+      this.logColorGenerationDebugSamples(20);
+    }
+  }
+
+  private logColorGenerationDebugSamples(sampleCount: number): void {
+    if (!this.configs) {
+      return;
+    }
+
+    const samples = [];
+    for (let index = 0; index < sampleCount; index += 1) {
+      const seed = this.configs.demoLevel.seed + this.day * 17000 + index * 409;
+      const seededConfigs: LoadedGameConfigs = {
+        ...this.configs,
+        demoLevel: {
+          ...this.configs.demoLevel,
+          seed
+        }
+      };
+      const jade = new JadeGenerator().generate(seededConfigs);
+      const visibleColorIds = this.getVisibleJadeColorIds(jade);
+      samples.push(
+        [
+          `stoneId=debug_color_${index}`,
+          `colorRegionCount=${jade.colorRegions.length}`,
+          `colors=${visibleColorIds.join(',') || 'base'}`,
+          `mainColor=${this.getMainJadeColorId(jade)}`,
+          `hasMultipleColors=${visibleColorIds.length > 1}`
+        ].join(' | ')
+      );
+    }
+
+    console.log(`[MvpGameController] color generation debug samples\n${samples.join('\n')}`);
+  }
+
+  private getVisibleJadeColorIds(jade: { sampleGrid: { colorId?: string; concentration: number }[] }): string[] {
+    const counts = new Map<string, number>();
+    for (const sample of jade.sampleGrid) {
+      if (!sample.colorId || sample.concentration < 0.08) {
+        continue;
+      }
+
+      counts.set(sample.colorId, (counts.get(sample.colorId) ?? 0) + 1);
+    }
+
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([colorId]) => colorId);
+  }
+
+  private getMainJadeColorId(jade: { sampleGrid: { colorId?: string; concentration: number }[] }): string {
+    return this.getVisibleJadeColorIds(jade)[0] ?? 'base';
   }
 
   private createEstimatedProducts(result: LayoutSettlementResult): EstimatedProductData[] {
@@ -1546,22 +1656,29 @@ export class MvpGameController extends Component {
         styleId: item.shapeId,
         displayName: item.displayName,
         estimatedPrice: Math.round(item.finalEstimate),
-        colorSummary: this.getMainColorSummary(item.colorCoverage),
+        colorSummary: this.createProductColorSummary(item.colorCoverage),
         crackPenalty: Math.round((1 - item.crackPenaltyCoefficient) * 100)
       }));
   }
 
-  private getMainColorSummary(colorCoverage: Record<string, number>): string {
-    let bestColor = 'base';
-    let bestCoverage = 0;
-    for (const [colorId, coverage] of Object.entries(colorCoverage)) {
-      if (coverage > bestCoverage) {
-        bestColor = colorId;
-        bestCoverage = coverage;
-      }
+  private createProductColorSummary(colorCoverage: Record<string, number>): ProductColorSummaryData {
+    const colors = Object.entries(colorCoverage)
+      .filter(([, ratio]) => ratio >= 0.03)
+      .map(([colorId, ratio]) => ({
+        colorId,
+        ratio
+      }))
+      .sort((a, b) => b.ratio - a.ratio);
+
+    if (colors.length === 0) {
+      colors.push({ colorId: 'base', ratio: 1 });
     }
 
-    return bestColor;
+    return {
+      mainColorId: colors[0].colorId,
+      colors,
+      isMultiColor: colors.length > 1
+    };
   }
 
   private shutdownWorkLayers(): void {
@@ -1639,8 +1756,13 @@ export class MvpGameController extends Component {
     return this.configs?.demoLevel.economy.materialQualities.find((quality) => quality.id === materialQualityId)?.displayName ?? materialQualityId;
   }
 
-  private getColorSummaryDisplayName(colorSummary: string): string {
-    return this.configs?.color.colors.find((color) => color.id === colorSummary)?.displayName ?? colorSummary;
+  private getColorSummaryDisplayName(colorSummary: ProductColorSummaryData): string {
+    const mainColorName = this.getColorDisplayName(colorSummary.mainColorId);
+    return colorSummary.isMultiColor ? `${mainColorName} / ${this.getText('multiColorTag')}` : mainColorName;
+  }
+
+  private getColorDisplayName(colorId: string): string {
+    return this.configs?.color.colors.find((color) => color.id === colorId)?.displayName ?? colorId;
   }
 
   private createCommercialPlaceholderPanel(): void {

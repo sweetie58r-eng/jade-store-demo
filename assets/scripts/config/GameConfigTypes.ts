@@ -66,6 +66,7 @@ export interface DemoLevelConfig {
     forceDeepCrackTestStone?: boolean;
     crackTestMode?: boolean;
     debugForceDeepCrack?: boolean;
+    showColorGenerationDebug?: boolean;
   };
 }
 
@@ -100,9 +101,15 @@ export interface ColorDefinitionConfig {
   radiusScaleRange: [number, number];
 }
 
+export interface ColorRegionCountWeightConfig {
+  count: number;
+  probability: number;
+}
+
 export interface ColorConfig {
   regionAlpha: number;
   concentrationRingCount: number;
+  regionColorCountWeights: ColorRegionCountWeightConfig[];
   colors: ColorDefinitionConfig[];
 }
 

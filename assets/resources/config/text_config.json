@@ -95,6 +95,7 @@
     "salesFinishedMessage": "今日售卖结束",
     "salesSoldOutMessage": "商品已售罄，剩余顾客离开",
     "commercialPlaceholderTitle": "商业化预留",
-    "placeholderNotice": "占位，不接入广告或支付"
+    "placeholderNotice": "占位，不接入广告或支付",
+    "multiColorTag": "\u591a\u8272"
   }
 }
