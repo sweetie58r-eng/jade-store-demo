@@ -2,6 +2,7 @@ import { Color, Component, Graphics, Label, Node, UITransform, Vec3, _decorator 
 
 import { ColorConfig, DemoLevelConfig, JadeConfig } from '../config/GameConfigTypes';
 import { CrackData, JadePieceData, RevealMaskPointData, Vec2Data } from '../data/JadeTypes';
+import { JadeMaterialRenderer } from './JadeMaterialRenderer';
 
 const { ccclass, property } = _decorator;
 const PORTRAIT_WIDTH = 720;
@@ -159,22 +160,11 @@ export class JadeDemoRenderer extends Component {
   }
 
   private drawJadeBase(graphics: Graphics, jade: JadePieceData, jadeConfig: JadeConfig): void {
-    this.drawPolygon(graphics, jade.outlinePolygon);
-    graphics.fillColor = parseHexColor(jadeConfig.baseFillColor, 255);
-    graphics.strokeColor = parseHexColor(jadeConfig.baseStrokeColor, 255);
-    graphics.lineWidth = 4;
-    graphics.fill();
-    graphics.stroke();
+    JadeMaterialRenderer.drawJadeBody(graphics, jade, jadeConfig);
   }
 
   private drawJadeSkin(graphics: Graphics, jade: JadePieceData): void {
-    this.drawPolygon(graphics, jade.outlinePolygon);
-    graphics.fillColor = new Color(139, 142, 137, 255);
-    graphics.strokeColor = new Color(31, 33, 31, 230);
-    graphics.lineWidth = 5;
-    graphics.fill();
-    graphics.stroke();
-    this.drawSkinTexture(graphics, jade);
+    JadeMaterialRenderer.drawJadeSkin(graphics, jade);
   }
 
   private drawJadeSkinOutline(graphics: Graphics, jade: JadePieceData, jadeConfig: JadeConfig): void {
@@ -184,23 +174,6 @@ export class JadeDemoRenderer extends Component {
     graphics.stroke();
   }
 
-  private drawSkinTexture(graphics: Graphics, jade: JadePieceData): void {
-    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 120));
-
-    for (let index = 0; index < jade.sampleGrid.length; index += step) {
-      const sample = jade.sampleGrid[index];
-      const angle = ((index * 37) % 360) * (Math.PI / 180);
-      const length = 8 + (index % 5) * 2;
-      const alpha = 18 + (index % 4) * 6;
-
-      graphics.strokeColor = new Color(220, 224, 216, alpha);
-      graphics.lineWidth = 1;
-      graphics.moveTo(sample.x - Math.cos(angle) * length * 0.5, sample.y - Math.sin(angle) * length * 0.5);
-      graphics.lineTo(sample.x + Math.cos(angle) * length * 0.5, sample.y + Math.sin(angle) * length * 0.5);
-      graphics.stroke();
-    }
-  }
-
   private drawPortraitStage(graphics: Graphics): void {
     graphics.fillColor = new Color(154, 143, 136, 255);
     graphics.rect(-PORTRAIT_WIDTH * 0.5, -PORTRAIT_HEIGHT * 0.5, PORTRAIT_WIDTH, PORTRAIT_HEIGHT);
@@ -208,21 +181,7 @@ export class JadeDemoRenderer extends Component {
   }
 
   private drawColorRegionsFromSamples(graphics: Graphics, jade: JadePieceData, colorConfig: ColorConfig): void {
-    const maxSamplesPerRegion = 520;
-
-    for (const region of jade.colorRegions) {
-      const samples = jade.sampleGrid.filter((sample) => sample.colorRegionId === region.id && sample.concentration > 0.08);
-      const step = Math.max(1, Math.ceil(samples.length / maxSamplesPerRegion));
-
-      for (let index = 0; index < samples.length; index += step) {
-        const sample = samples[index];
-        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(1, sample.concentration * 1.12) * 0.98);
-        const radius = Math.max(2.7, jade.sampleCellSize * (0.48 + sample.concentration * 0.42));
-        graphics.circle(sample.x, sample.y, radius);
-        graphics.fillColor = parseHexColor(region.displayColor || '#ff00ff', alpha);
-        graphics.fill();
-      }
-    }
+    JadeMaterialRenderer.drawColorRegions(graphics, jade, colorConfig);
   }
 
   private drawRevealDelta(
@@ -236,8 +195,6 @@ export class JadeDemoRenderer extends Component {
       return;
     }
 
-    const baseRadius = Math.max(2.6, demoLevelConfig.reveal.revealCellSize * 0.74);
-    const colorRadius = Math.max(2.4, demoLevelConfig.reveal.revealCellSize * 0.68);
     const colorById = new Map(colorConfig.colors.map((item) => [item.id, item.displayColor]));
 
     for (const sample of changedRevealPoints) {
@@ -246,18 +203,7 @@ export class JadeDemoRenderer extends Component {
         continue;
       }
 
-      graphics.circle(sample.x, sample.y, baseRadius);
-      graphics.fillColor = parseHexColor(jadeConfig.baseFillColor, 235);
-      graphics.fill();
-
-      if (sample.colorId && sample.concentration > 0.04) {
-        const alpha = Math.round(255 * colorConfig.regionAlpha * Math.min(1, sample.concentration * 1.14) * 1.05);
-        const radius = colorRadius * (1.06 + sample.concentration * 0.28);
-        graphics.circle(sample.x, sample.y, radius);
-        graphics.fillColor = parseHexColor(colorById.get(sample.colorId) ?? '#ff00ff', alpha);
-        graphics.fill();
-      }
-
+      JadeMaterialRenderer.drawRevealPoint(graphics, sample, jadeConfig, colorConfig, demoLevelConfig, colorById);
       this.drawnRevealKeys.add(key);
     }
   }
@@ -326,7 +272,6 @@ export class JadeDemoRenderer extends Component {
       return;
     }
 
-    const color = parseHexColor(crack.displayColor, Math.round(255 * crack.displayAlpha));
     const revealCellSize = demoLevelConfig.reveal.revealCellSize;
     const revealDistance = Math.max(1.8, revealCellSize * 0.82);
     const subSegmentLength = Math.max(1.4, revealCellSize * 0.48);
@@ -356,11 +301,7 @@ export class JadeDemoRenderer extends Component {
           continue;
         }
 
-        graphics.strokeColor = color;
-        graphics.lineWidth = Math.max(1, width);
-        graphics.moveTo(stepStart.x, stepStart.y);
-        graphics.lineTo(stepEnd.x, stepEnd.y);
-        graphics.stroke();
+        JadeMaterialRenderer.drawCrackSegment(graphics, crack, stepStart, stepEnd, width);
         this.drawnCrackSegmentKeys.add(segmentKey);
       }
     }
@@ -407,21 +348,10 @@ export class JadeDemoRenderer extends Component {
   }
 
   private drawCrackBand(graphics: Graphics, crack: CrackData): void {
-    const bandPoints = createCrackBandPoints(crack);
-
-    if (bandPoints.length < 3) {
-      return;
-    }
-
-    this.drawPolygon(graphics, bandPoints);
-    const bandAlpha = crack.type === 'deep' ? 0.22 : 0.1;
-    graphics.fillColor = parseHexColor(crack.displayColor, Math.round(255 * crack.displayAlpha * bandAlpha));
-    graphics.fill();
+    JadeMaterialRenderer.drawCrackBand(graphics, crack);
   }
 
   private drawCrackSegments(graphics: Graphics, crack: CrackData): void {
-    const color = parseHexColor(crack.displayColor, Math.round(255 * crack.displayAlpha));
-
     for (let index = 0; index < crack.points.length - 1; index += 1) {
       const start = crack.points[index];
       const end = crack.points[index + 1];
@@ -429,17 +359,7 @@ export class JadeDemoRenderer extends Component {
       const rawWidth = getCrackWidthAt(crack, t) * (index % 2 === 0 ? 1.05 : 0.86);
       const width = rawWidth * (crack.type === 'deep' ? 0.72 : 0.56);
 
-      graphics.strokeColor = color;
-      graphics.lineWidth = Math.max(1, width);
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
-
-      graphics.strokeColor = parseHexColor('#000000', Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.18 : 0.1)));
-      graphics.lineWidth = Math.max(1, width * 0.24);
-      graphics.moveTo(start.x, start.y);
-      graphics.lineTo(end.x, end.y);
-      graphics.stroke();
+      JadeMaterialRenderer.drawCrackSegment(graphics, crack, start, end, width);
     }
   }
 
@@ -463,11 +383,7 @@ export class JadeDemoRenderer extends Component {
         y: base.y + normal.y * branchLength + (dy / length) * branchLength * 0.28
       };
 
-      graphics.strokeColor = parseHexColor(crack.displayColor, Math.round(255 * crack.displayAlpha * 0.72));
-      graphics.lineWidth = Math.max(1, crack.width * (crack.type === 'deep' ? 0.26 : 0.18));
-      graphics.moveTo(base.x, base.y);
-      graphics.lineTo(branchEnd.x, branchEnd.y);
-      graphics.stroke();
+      JadeMaterialRenderer.drawCrackBranch(graphics, crack, base, branchEnd);
     }
   }
 
@@ -505,37 +421,6 @@ function lerpPoint(start: Vec2Data, end: Vec2Data, t: number): Vec2Data {
     x: start.x + (end.x - start.x) * t,
     y: start.y + (end.y - start.y) * t
   };
-}
-
-function createCrackBandPoints(crack: CrackData): Vec2Data[] {
-  const leftSide: Vec2Data[] = [];
-  const rightSide: Vec2Data[] = [];
-
-  for (let index = 0; index < crack.points.length; index += 1) {
-    const point = crack.points[index];
-    const previous = crack.points[Math.max(0, index - 1)];
-    const next = crack.points[Math.min(crack.points.length - 1, index + 1)];
-    const dx = next.x - previous.x;
-    const dy = next.y - previous.y;
-    const length = Math.max(1, Math.hypot(dx, dy));
-    const normalX = -dy / length;
-    const normalY = dx / length;
-    const t = index / Math.max(1, crack.points.length - 1);
-    const width = getCrackWidthAt(crack, t);
-    const ragged = 0.76 + ((hashString(`${crack.id}_${index}`) % 17) / 100);
-    const halfWidth = width * 0.5 * ragged;
-
-    leftSide.push({
-      x: point.x + normalX * halfWidth,
-      y: point.y + normalY * halfWidth
-    });
-    rightSide.push({
-      x: point.x - normalX * halfWidth * 0.86,
-      y: point.y - normalY * halfWidth * 0.86
-    });
-  }
-
-  return [...leftSide, ...rightSide.reverse()];
 }
 
 function getCrackWidthAt(crack: CrackData, t: number): number {

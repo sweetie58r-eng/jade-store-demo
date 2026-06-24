@@ -8,7 +8,7 @@
     "sampleCellSize": 8,
     "highQualitySampleCellSize": 4,
     "settlementSampleCellSize": 6,
-    "debugShowSamples": true,
+    "debugShowSamples": false,
     "maxDebugSamples": 280,
     "debugSampleAlpha": 0.08
   },
