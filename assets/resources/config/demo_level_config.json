@@ -185,6 +185,6 @@
     "crackTestMode": false,
     "debugForceDeepCrack": false,
     "showColorGenerationDebug": true,
-    "forceColorfulTestStone": true
+    "forceColorfulTestStone": false
   }
 }

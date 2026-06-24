@@ -1761,13 +1761,20 @@ export class MvpGameController extends Component {
     for (const stone of stones) {
       const jade = stone.jade;
       const visibleColorIds = this.getVisibleJadeColorIds(jade);
+      const colorStats = this.getJadeColorCoverageStats(jade);
       console.log(
         [
           '[MvpGameController] market color sample',
           `stoneId=${stone.id}`,
+          `stonePriceTier=${getStonePriceTier(stone.price)}`,
+          `stonePrice=${stone.price}`,
           `colorRegionCount=${jade.colorRegions.length}`,
           `colors=${visibleColorIds.join(',') || 'base'}`,
           `mainColor=${this.getMainJadeColorId(jade)}`,
+          `colorAreaRatios=${formatColorRatios(colorStats.ratios)}`,
+          `concentration=${formatColorRatios(colorStats.concentrations)}`,
+          `materialQuality=${jade.materialQualityId}`,
+          `crackCount=${jade.cracks.length}`,
           `hasMultipleColors=${visibleColorIds.length > 1}`
         ].join(' | ')
       );
@@ -1795,12 +1802,18 @@ export class MvpGameController extends Component {
       };
       const jade = new JadeGenerator().generate(seededConfigs);
       const visibleColorIds = this.getVisibleJadeColorIds(jade);
+      const colorStats = this.getJadeColorCoverageStats(jade);
       samples.push(
         [
           `stoneId=debug_color_${index}`,
+          `qualityProfile=${jade.qualityProfileId}`,
           `colorRegionCount=${jade.colorRegions.length}`,
           `colors=${visibleColorIds.join(',') || 'base'}`,
           `mainColor=${this.getMainJadeColorId(jade)}`,
+          `colorAreaRatios=${formatColorRatios(colorStats.ratios)}`,
+          `concentration=${formatColorRatios(colorStats.concentrations)}`,
+          `materialQuality=${jade.materialQualityId}`,
+          `crackCount=${jade.cracks.length}`,
           `hasMultipleColors=${visibleColorIds.length > 1}`
         ].join(' | ')
       );
@@ -1857,6 +1870,41 @@ export class MvpGameController extends Component {
 
   private getMainJadeColorId(jade: { sampleGrid: { colorId?: string; concentration: number }[] }): string {
     return this.getVisibleJadeColorIds(jade)[0] ?? 'base';
+  }
+
+  private getJadeColorCoverageStats(jade: { sampleGrid: { colorId?: string; concentration: number }[] }): {
+    ratios: Map<string, number>;
+    concentrations: Map<string, number>;
+  } {
+    const counts = new Map<string, number>();
+    const concentrationSums = new Map<string, number>();
+    let coloredSampleCount = 0;
+
+    for (const sample of jade.sampleGrid) {
+      if (!sample.colorId || sample.concentration < 0.08) {
+        continue;
+      }
+
+      coloredSampleCount += 1;
+      counts.set(sample.colorId, (counts.get(sample.colorId) ?? 0) + 1);
+      concentrationSums.set(sample.colorId, (concentrationSums.get(sample.colorId) ?? 0) + sample.concentration);
+    }
+
+    const ratios = new Map<string, number>();
+    const concentrations = new Map<string, number>();
+    const denominator = Math.max(1, jade.sampleGrid.length);
+
+    for (const [colorId, count] of counts.entries()) {
+      ratios.set(colorId, count / denominator);
+      concentrations.set(colorId, (concentrationSums.get(colorId) ?? 0) / Math.max(1, count));
+    }
+
+    if (coloredSampleCount === 0) {
+      ratios.set('base', 1);
+      concentrations.set('base', 0);
+    }
+
+    return { ratios, concentrations };
   }
 
   private createEstimatedProducts(result: LayoutSettlementResult): EstimatedProductData[] {
@@ -2330,6 +2378,29 @@ function formatCountMap(counts: Map<string, number>): string {
   return [...counts.entries()]
     .map(([key, count]) => `${key}:${count}`)
     .join(',');
+}
+
+function formatColorRatios(values: Map<string, number>): string {
+  return [...values.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([key, value]) => `${key}:${value.toFixed(2)}`)
+    .join(',');
+}
+
+function getStonePriceTier(price: number): string {
+  if (price < 800) {
+    return 'budget';
+  }
+
+  if (price < 2200) {
+    return 'standard';
+  }
+
+  if (price < 5200) {
+    return 'high';
+  }
+
+  return 'premium';
 }
 
 function stopPropagation(event: EventTouch): void {

@@ -172,11 +172,13 @@ export class JadeGenerator {
   private pickColorByRichness(configs: LoadedGameConfigs, random: SeededRandom, colorRichness: number, excludedColorIds?: Set<string>): ColorDefinitionConfig {
     const availableColors = configs.color.colors.filter((color) => !excludedColorIds?.has(color.id));
     const colorPool = availableColors.length > 0 ? availableColors : configs.color.colors;
+    const normalizedRichness = clamp((colorRichness - 0.3) / 1.3, 0, 1);
     const weightedColors = colorPool.map((color) => {
-      const valueBias = Math.pow(Math.max(0.25, color.valueMultiplier), colorRichness - 0.8);
+      const valueBias = Math.pow(Math.max(0.4, color.valueMultiplier), (normalizedRichness - 0.45) * 0.65);
+      const lowTierFloor = color.valueMultiplier >= 2.4 ? 0.46 : 0.72;
       return {
         ...color,
-        probability: color.probability * valueBias
+        probability: Math.max(color.probability * valueBias, color.probability * lowTierFloor)
       };
     });
 
