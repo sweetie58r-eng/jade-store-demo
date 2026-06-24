@@ -34,7 +34,7 @@
     "lowPriceSellBias": 1.35,
     "newPlayerProtectionDays": 3,
     "marketDiscountForNewPlayer": 0.75,
-    "guaranteedPlayableStonePerDay": 1,
+    "guaranteedPlayableStonePerDay": 2,
     "qualityProfiles": [
       {
         "id": "waste",

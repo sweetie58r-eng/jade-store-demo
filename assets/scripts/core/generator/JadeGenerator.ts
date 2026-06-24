@@ -174,8 +174,8 @@ export class JadeGenerator {
     const colorPool = availableColors.length > 0 ? availableColors : configs.color.colors;
     const normalizedRichness = clamp((colorRichness - 0.3) / 1.3, 0, 1);
     const weightedColors = colorPool.map((color) => {
-      const valueBias = Math.pow(Math.max(0.4, color.valueMultiplier), (normalizedRichness - 0.45) * 0.65);
-      const lowTierFloor = color.valueMultiplier >= 2.4 ? 0.46 : 0.72;
+      const valueBias = Math.pow(Math.max(0.45, color.valueMultiplier), (normalizedRichness - 0.42) * 0.42);
+      const lowTierFloor = color.valueMultiplier >= 2.4 ? 0.82 : 0.9;
       return {
         ...color,
         probability: Math.max(color.probability * valueBias, color.probability * lowTierFloor)

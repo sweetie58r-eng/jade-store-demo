@@ -4,26 +4,26 @@
   "regionColorCountWeights": [
     {
       "count": 1,
-      "probability": 0.45
+      "probability": 0.24
     },
     {
       "count": 2,
-      "probability": 0.35
+      "probability": 0.42
     },
     {
       "count": 3,
-      "probability": 0.15
+      "probability": 0.25
     },
     {
       "count": 4,
-      "probability": 0.05
+      "probability": 0.09
     }
   ],
   "colors": [
     {
       "id": "white",
       "displayName": "白色",
-      "probability": 0.16,
+      "probability": 0.12,
       "displayColor": "#f3f0dc",
       "valueMultiplier": 0.35,
       "concentrationRange": [0.3, 0.8],
@@ -32,7 +32,7 @@
     {
       "id": "gray_white",
       "displayName": "灰白",
-      "probability": 0.12,
+      "probability": 0.09,
       "displayColor": "#c8cbc0",
       "valueMultiplier": 0.22,
       "concentrationRange": [0.2, 0.65],
@@ -41,7 +41,7 @@
     {
       "id": "light_green",
       "displayName": "浅绿色",
-      "probability": 0.18,
+      "probability": 0.14,
       "displayColor": "#a8d7a3",
       "valueMultiplier": 0.8,
       "concentrationRange": [0.35, 0.8],
@@ -50,7 +50,7 @@
     {
       "id": "green",
       "displayName": "普通绿色",
-      "probability": 0.16,
+      "probability": 0.13,
       "displayColor": "#54a85f",
       "valueMultiplier": 1.8,
       "concentrationRange": [0.45, 0.9],
@@ -77,7 +77,7 @@
     {
       "id": "yellow",
       "displayName": "黄色",
-      "probability": 0.09,
+      "probability": 0.14,
       "displayColor": "#d8b44a",
       "valueMultiplier": 2.4,
       "concentrationRange": [0.45, 0.95],
@@ -86,7 +86,7 @@
     {
       "id": "red",
       "displayName": "红色",
-      "probability": 0.05,
+      "probability": 0.09,
       "displayColor": "#b44a3f",
       "valueMultiplier": 5.0,
       "concentrationRange": [0.5, 1.0],
@@ -95,7 +95,7 @@
     {
       "id": "purple",
       "displayName": "紫色",
-      "probability": 0.08,
+      "probability": 0.13,
       "displayColor": "#9265b5",
       "valueMultiplier": 3.0,
       "concentrationRange": [0.45, 0.95],
@@ -104,7 +104,7 @@
     {
       "id": "ink",
       "displayName": "墨色",
-      "probability": 0.05,
+      "probability": 0.09,
       "displayColor": "#24312d",
       "valueMultiplier": 3.8,
       "concentrationRange": [0.55, 1.0],
@@ -113,7 +113,7 @@
     {
       "id": "mixed",
       "displayName": "彩色混合",
-      "probability": 0.03,
+      "probability": 0.07,
       "displayColor": "#68a9b0",
       "valueMultiplier": 6.0,
       "concentrationRange": [0.45, 1.0],

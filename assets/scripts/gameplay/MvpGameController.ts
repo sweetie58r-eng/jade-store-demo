@@ -35,6 +35,7 @@ const SALES_EVENT_INTERVAL_SECONDS = 0.62;
 const PROCESSING_ANIMATION_SECONDS = 1.35;
 const DEFAULT_SHELF_SLOT_COUNT = 6;
 const INTERESTING_COLOR_IDS = new Set(['yellow', 'red', 'purple', 'ink', 'mixed', 'vivid_green', 'deep_green']);
+const SPECIAL_SURPRISE_COLOR_IDS = new Set(['yellow', 'red', 'purple', 'ink', 'mixed']);
 
 type ProductSaleStatus = 'pending' | 'sold' | 'unsold';
 type InventoryFilter = 'all' | ProductStatus;
@@ -1644,6 +1645,7 @@ export class MvpGameController extends Component {
     if (this.day <= protectionDays && index < guaranteedCount) {
       let fallbackSeed = baseSeed;
       let interestingFallbackSeed: number | null = null;
+      let surpriseFallbackSeed: number | null = null;
       for (let attempt = 0; attempt < 36; attempt += 1) {
         const seed = baseSeed + attempt * 307;
         const seededConfigs: LoadedGameConfigs = {
@@ -1656,6 +1658,7 @@ export class MvpGameController extends Component {
         const testJade = new JadeGenerator().generate(seededConfigs);
         const deepCount = testJade.cracks.filter((crack) => crack.type === 'deep').length;
         const visibleColorIds = this.getVisibleJadeColorIds(testJade);
+        const hasSpecialSurpriseColor = visibleColorIds.some((colorId) => SPECIAL_SURPRISE_COLOR_IDS.has(colorId));
         const hasRareOrSpecialColor = visibleColorIds.some((colorId) => INTERESTING_COLOR_IDS.has(colorId));
         const hasInterestingColor = visibleColorIds.length >= 2 || hasRareOrSpecialColor;
         const hasUsefulColor = hasInterestingColor || testJade.sampleGrid.some((sample) => sample.colorId && sample.concentration >= 0.58);
@@ -1668,12 +1671,16 @@ export class MvpGameController extends Component {
           interestingFallbackSeed = seed;
         }
 
-        if (playableProfile && deepCount <= 1 && hasRareOrSpecialColor) {
+        if (playableProfile && deepCount <= 1 && hasSpecialSurpriseColor && surpriseFallbackSeed === null) {
+          surpriseFallbackSeed = seed;
+        }
+
+        if (playableProfile && deepCount <= 1 && hasSpecialSurpriseColor && visibleColorIds.length >= 2) {
           return seed;
         }
       }
 
-      return interestingFallbackSeed ?? fallbackSeed;
+      return surpriseFallbackSeed ?? interestingFallbackSeed ?? fallbackSeed;
     }
 
     return baseSeed;
@@ -1762,20 +1769,25 @@ export class MvpGameController extends Component {
       const jade = stone.jade;
       const visibleColorIds = this.getVisibleJadeColorIds(jade);
       const colorStats = this.getJadeColorCoverageStats(jade);
+      const hasRareColor = visibleColorIds.some((colorId) => SPECIAL_SURPRISE_COLOR_IDS.has(colorId));
+      const hasMultiColor = visibleColorIds.length > 1;
       console.log(
         [
           '[MvpGameController] market color sample',
+          `stoneIndex=${stone.id.split('_').pop() ?? '0'}`,
           `stoneId=${stone.id}`,
           `stonePriceTier=${getStonePriceTier(stone.price)}`,
           `stonePrice=${stone.price}`,
           `colorRegionCount=${jade.colorRegions.length}`,
           `colors=${visibleColorIds.join(',') || 'base'}`,
+          `hasRareColor=${hasRareColor}`,
+          `hasMultiColor=${hasMultiColor}`,
           `mainColor=${this.getMainJadeColorId(jade)}`,
           `colorAreaRatios=${formatColorRatios(colorStats.ratios)}`,
           `concentration=${formatColorRatios(colorStats.concentrations)}`,
           `materialQuality=${jade.materialQualityId}`,
           `crackCount=${jade.cracks.length}`,
-          `hasMultipleColors=${visibleColorIds.length > 1}`
+          `hasMultipleColors=${hasMultiColor}`
         ].join(' | ')
       );
     }
@@ -1803,18 +1815,23 @@ export class MvpGameController extends Component {
       const jade = new JadeGenerator().generate(seededConfigs);
       const visibleColorIds = this.getVisibleJadeColorIds(jade);
       const colorStats = this.getJadeColorCoverageStats(jade);
+      const hasRareColor = visibleColorIds.some((colorId) => SPECIAL_SURPRISE_COLOR_IDS.has(colorId));
+      const hasMultiColor = visibleColorIds.length > 1;
       samples.push(
         [
           `stoneId=debug_color_${index}`,
+          `stoneIndex=${index}`,
           `qualityProfile=${jade.qualityProfileId}`,
           `colorRegionCount=${jade.colorRegions.length}`,
           `colors=${visibleColorIds.join(',') || 'base'}`,
+          `hasRareColor=${hasRareColor}`,
+          `hasMultiColor=${hasMultiColor}`,
           `mainColor=${this.getMainJadeColorId(jade)}`,
           `colorAreaRatios=${formatColorRatios(colorStats.ratios)}`,
           `concentration=${formatColorRatios(colorStats.concentrations)}`,
           `materialQuality=${jade.materialQualityId}`,
           `crackCount=${jade.cracks.length}`,
-          `hasMultipleColors=${visibleColorIds.length > 1}`
+          `hasMultipleColors=${hasMultiColor}`
         ].join(' | ')
       );
     }
