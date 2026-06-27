@@ -66,7 +66,7 @@ export class JadeDemoRenderer extends Component {
       return;
     }
 
-    this.drawRevealDelta(fillGraphics, jadeConfig, colorConfig, demoLevelConfig, changedRevealPoints);
+    this.drawRevealDelta(fillGraphics, jade, jadeConfig, colorConfig, demoLevelConfig, changedRevealPoints);
     this.indexRevealedMaskForCracks(changedRevealPoints, demoLevelConfig.reveal.revealCellSize);
     if (changedRevealPoints.length > 0) {
       this.drawRevealedCracks(crackGraphics, jade, demoLevelConfig);
@@ -186,6 +186,7 @@ export class JadeDemoRenderer extends Component {
 
   private drawRevealDelta(
     graphics: Graphics,
+    jade: JadePieceData,
     jadeConfig: JadeConfig,
     colorConfig: ColorConfig,
     demoLevelConfig: DemoLevelConfig,
@@ -203,7 +204,7 @@ export class JadeDemoRenderer extends Component {
         continue;
       }
 
-      JadeMaterialRenderer.drawRevealPoint(graphics, sample, jadeConfig, colorConfig, demoLevelConfig, colorById);
+      JadeMaterialRenderer.drawRevealPoint(graphics, sample, jade, jadeConfig, colorConfig, demoLevelConfig, colorById);
       this.drawnRevealKeys.add(key);
     }
   }

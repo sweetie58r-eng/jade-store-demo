@@ -24,23 +24,27 @@ export class JadeMaterialRenderer {
     const profile = getMaterialProfile(jade.materialQualityId);
     drawPolygon(graphics, jade.outlinePolygon);
     graphics.fillColor = mixHexColor(jadeConfig.baseFillColor, profile.baseTint, profile.tintAmount, 255);
-    graphics.strokeColor = parseHexColor(jadeConfig.baseStrokeColor, 255);
-    graphics.lineWidth = profile.strokeWidth;
     graphics.fill();
-    graphics.stroke();
 
-    this.drawInteriorHaze(graphics, jade, profile);
+    this.drawLowFrequencyClouds(graphics, jade, profile);
+    this.drawCottonFibers(graphics, jade, profile);
     this.drawInteriorGrain(graphics, jade, profile);
     this.drawInteriorHighlights(graphics, jade, profile);
+    this.drawEdgeDepth(graphics, jade, jadeConfig, profile);
+
+    drawPolygon(graphics, jade.outlinePolygon);
+    graphics.strokeColor = parseHexColor(jadeConfig.baseStrokeColor, 235);
+    graphics.lineWidth = profile.strokeWidth;
+    graphics.stroke();
   }
 
   public static drawColorRegions(graphics: Graphics, jade: JadePieceData, colorConfig: ColorConfig): void {
     const colorById = new Map(colorConfig.colors.map((item) => [item.id, item.displayColor]));
     const layerSettings = [
-      { threshold: 0.05, maxSamples: 190, radiusMultiplier: 2.35, alphaMultiplier: 0.18 },
-      { threshold: 0.14, maxSamples: 240, radiusMultiplier: 1.75, alphaMultiplier: 0.28 },
-      { threshold: 0.28, maxSamples: 300, radiusMultiplier: 1.25, alphaMultiplier: 0.42 },
-      { threshold: 0.48, maxSamples: 360, radiusMultiplier: 0.86, alphaMultiplier: 0.58 }
+      { threshold: 0.05, maxSamples: 150, radiusMultiplier: 1.42, alphaMultiplier: 0.13 },
+      { threshold: 0.16, maxSamples: 190, radiusMultiplier: 1.08, alphaMultiplier: 0.23 },
+      { threshold: 0.32, maxSamples: 230, radiusMultiplier: 0.76, alphaMultiplier: 0.36 },
+      { threshold: 0.55, maxSamples: 260, radiusMultiplier: 0.52, alphaMultiplier: 0.52 }
     ];
 
     for (const region of jade.colorRegions) {
@@ -62,18 +66,21 @@ export class JadeMaterialRenderer {
               clamp(sample.concentration * 1.3, 0.2, 1.0)
           );
           const radius = Math.max(
-            2.5,
+            1.8,
             jade.sampleCellSize * setting.radiusMultiplier * (0.82 + sample.concentration * 0.38)
           );
+          const center = { x: sample.x + jitter.x, y: sample.y + jitter.y };
+          const safeRadius = getSafeRadius(center, jade.outlinePolygon, radius, 1.2);
+          if (safeRadius <= 0.65) {
+            continue;
+          }
 
-          graphics.circle(sample.x + jitter.x, sample.y + jitter.y, radius);
-          graphics.fillColor = parseHexColor(regionColor, alpha);
-          graphics.fill();
+          drawIrregularBlob(graphics, center, safeRadius, parseHexColor(regionColor, alpha), `${region.id}_${layerIndex}_${index}`);
         }
       }
 
       if (region.colorId === 'mixed') {
-        this.drawMixedColorAccents(graphics, regionSamples, jade.sampleCellSize, colorConfig.regionAlpha, region.id);
+        this.drawMixedColorAccents(graphics, jade, regionSamples, jade.sampleCellSize, colorConfig.regionAlpha, region.id);
       }
     }
   }
@@ -94,35 +101,34 @@ export class JadeMaterialRenderer {
   public static drawRevealPoint(
     graphics: Graphics,
     sample: RevealMaskPointData,
+    jade: JadePieceData,
     jadeConfig: JadeConfig,
     colorConfig: ColorConfig,
     demoLevelConfig: DemoLevelConfig,
     colorById: Map<string, string>
   ): void {
     const baseRadius = Math.max(2.7, demoLevelConfig.reveal.revealCellSize * 0.8);
-    const softRadius = baseRadius * 1.95;
+    const softRadius = getSafeRadius(sample, jade.outlinePolygon, baseRadius * 1.55, 0.6);
+    const safeBaseRadius = getSafeRadius(sample, jade.outlinePolygon, baseRadius * 1.02, 0.4);
     const colorRadius = Math.max(2.5, demoLevelConfig.reveal.revealCellSize * 0.78);
 
-    graphics.circle(sample.x, sample.y, softRadius);
-    graphics.fillColor = parseHexColor(jadeConfig.baseFillColor, 60);
-    graphics.fill();
+    if (softRadius > 0.5) {
+      drawIrregularBlob(graphics, sample, softRadius, parseHexColor(jadeConfig.baseFillColor, 44), `reveal_soft_${sample.x}_${sample.y}`);
+    }
 
-    graphics.circle(sample.x, sample.y, baseRadius * 1.12);
-    graphics.fillColor = parseHexColor(jadeConfig.baseFillColor, 218);
-    graphics.fill();
+    if (safeBaseRadius > 0.5) {
+      drawIrregularBlob(graphics, sample, safeBaseRadius, parseHexColor(jadeConfig.baseFillColor, 218), `reveal_base_${sample.x}_${sample.y}`);
+    }
 
     if (sample.colorId && sample.concentration > 0.035) {
       const regionColor = colorById.get(sample.colorId) ?? '#ff00ff';
       const alpha = Math.round(255 * colorConfig.regionAlpha * clamp(sample.concentration * 1.18, 0.14, 1) * 1.08);
-      const radius = colorRadius * (1.1 + sample.concentration * 0.34);
+      const radius = getSafeRadius(sample, jade.outlinePolygon, colorRadius * (1.0 + sample.concentration * 0.24), 0.5);
 
-      graphics.circle(sample.x, sample.y, radius * 1.55);
-      graphics.fillColor = parseHexColor(regionColor, Math.round(alpha * 0.32));
-      graphics.fill();
-
-      graphics.circle(sample.x, sample.y, radius);
-      graphics.fillColor = parseHexColor(regionColor, alpha);
-      graphics.fill();
+      if (radius > 0.5) {
+        drawIrregularBlob(graphics, sample, radius * 1.18, parseHexColor(regionColor, Math.round(alpha * 0.24)), `reveal_color_soft_${sample.x}_${sample.y}`);
+        drawIrregularBlob(graphics, sample, radius, parseHexColor(regionColor, alpha), `reveal_color_${sample.x}_${sample.y}`);
+      }
     }
 
     const powderAlpha = 16 + (hashString(`${Math.round(sample.x)}_${Math.round(sample.y)}`) % 16);
@@ -140,7 +146,7 @@ export class JadeMaterialRenderer {
     }
 
     drawPolygon(graphics, bandPoints);
-    const bandAlpha = crack.type === 'deep' ? 0.16 : 0.07;
+    const bandAlpha = crack.type === 'deep' ? 0.08 : 0.045;
     graphics.fillColor = parseHexColor(crack.displayColor, Math.round(255 * crack.displayAlpha * bandAlpha));
     graphics.fill();
   }
@@ -156,24 +162,24 @@ export class JadeMaterialRenderer {
     const alphaScale = options.alphaScale ?? 1;
     const widthScale = options.widthScale ?? 1;
     const mainWidth = Math.max(1, width * widthScale);
-    const edgeAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.34 : 0.22) * alphaScale);
-    const mainAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.98 : 0.76) * alphaScale);
-    const coreAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.45 : 0.16) * alphaScale);
+    const edgeAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.26 : 0.18) * alphaScale);
+    const mainAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.72 : 0.5) * alphaScale);
+    const coreAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.26 : 0.08) * alphaScale);
 
     graphics.strokeColor = crack.type === 'deep' ? new Color(218, 222, 213, edgeAlpha) : new Color(232, 235, 228, edgeAlpha);
-    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 1.72 : 1.42));
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 1.42 : 1.22));
     graphics.moveTo(start.x, start.y);
     graphics.lineTo(end.x, end.y);
     graphics.stroke();
 
     graphics.strokeColor = parseHexColor(crack.displayColor, mainAlpha);
-    graphics.lineWidth = mainWidth;
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.82 : 0.72));
     graphics.moveTo(start.x, start.y);
     graphics.lineTo(end.x, end.y);
     graphics.stroke();
 
     graphics.strokeColor = parseHexColor('#000000', coreAlpha);
-    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.34 : 0.2));
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.18 : 0.12));
     graphics.moveTo(start.x, start.y);
     graphics.lineTo(end.x, end.y);
     graphics.stroke();
@@ -184,16 +190,39 @@ export class JadeMaterialRenderer {
     this.drawCrackSegment(graphics, crack, start, end, width, { alphaScale: crack.type === 'deep' ? 0.68 : 0.5 });
   }
 
-  private static drawInteriorHaze(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
-    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 160));
+  private static drawLowFrequencyClouds(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 95));
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
-      const noise = (hashString(`${jade.id}_haze_${index}`) % 1000) / 1000;
-      const radius = jade.sampleCellSize * (2.4 + noise * 3.2);
-      const tint = noise > 0.52 ? '#eff6ea' : '#aebba8';
-      graphics.circle(sample.x, sample.y, radius);
-      graphics.fillColor = parseHexColor(tint, Math.round(profile.hazeAlpha * (0.45 + noise * 0.55)));
-      graphics.fill();
+      const noise = hashString(`${jade.id}_cloud_${index}`);
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 1.4) {
+        continue;
+      }
+
+      const angle = ((noise % 160) - 80) * (Math.PI / 180);
+      const length = Math.min(distance * 1.35, jade.sampleCellSize * (5.2 + ((noise >> 4) % 8) * 0.45));
+      const alpha = Math.round(profile.hazeAlpha * (0.35 + ((noise >> 9) % 100) / 210));
+      const tint = noise % 2 === 0 ? '#edf4e8' : '#9eab99';
+      drawSoftFiber(graphics, sample, angle, length, parseHexColor(tint, alpha), 1.8);
+    }
+  }
+
+  private static drawCottonFibers(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 150));
+
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const noise = hashString(`${jade.id}_cotton_${index}`);
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize) {
+        continue;
+      }
+
+      const angle = ((noise % 360) * Math.PI) / 180;
+      const length = Math.min(distance * 1.25, jade.sampleCellSize * (2.2 + ((noise >> 3) % 9) * 0.28));
+      const alpha = Math.round((profile.hazeAlpha + profile.grainAlpha) * 0.42);
+      drawSoftFiber(graphics, sample, angle, length, new Color(245, 248, 238, alpha), 1);
     }
   }
 
@@ -204,7 +233,10 @@ export class JadeMaterialRenderer {
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
       const noise = hashString(`${jade.id}_grain_${index}`);
-      const radius = 0.7 + (noise % 5) * 0.16;
+      const radius = Math.min(getSafeRadius(sample, jade.outlinePolygon, 0.72 + (noise % 4) * 0.1, 0.2), 1.1);
+      if (radius <= 0.22) {
+        continue;
+      }
       const alpha = Math.round(profile.grainAlpha * (0.55 + ((noise >> 4) % 100) / 210));
       graphics.circle(sample.x, sample.y, radius);
       graphics.fillColor = new Color(76, 84, 75, alpha);
@@ -223,8 +255,12 @@ export class JadeMaterialRenderer {
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
       const noise = hashString(`${jade.id}_highlight_${index}`);
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 1.2) {
+        continue;
+      }
       const angle = ((noise % 360) * Math.PI) / 180;
-      const length = jade.sampleCellSize * (2.4 + ((noise >> 5) % 5) * 0.5);
+      const length = Math.min(distance * 1.2, jade.sampleCellSize * (2.4 + ((noise >> 5) % 5) * 0.5));
 
       graphics.strokeColor = new Color(255, 255, 248, Math.round(profile.highlightAlpha * (0.45 + ((noise >> 9) % 100) / 190)));
       graphics.lineWidth = 1.1;
@@ -236,6 +272,7 @@ export class JadeMaterialRenderer {
 
   private static drawMixedColorAccents(
     graphics: Graphics,
+    jade: JadePieceData,
     samples: { x: number; y: number; concentration: number }[],
     sampleCellSize: number,
     regionAlpha: number,
@@ -249,9 +286,19 @@ export class JadeMaterialRenderer {
       const hash = hashString(`${regionId}_mixed_${index}`);
       const color = mixedPalette[hash % mixedPalette.length];
       const jitter = getJitter(`${regionId}_mixed_jitter_${index}`, sampleCellSize * 0.42);
-      graphics.circle(sample.x + jitter.x, sample.y + jitter.y, sampleCellSize * (0.78 + sample.concentration * 0.55));
-      graphics.fillColor = parseHexColor(color, Math.round(255 * regionAlpha * clamp(sample.concentration, 0.22, 0.72) * 0.7));
-      graphics.fill();
+      const center = { x: sample.x + jitter.x, y: sample.y + jitter.y };
+      const radius = getSafeRadius(center, jade.outlinePolygon, sampleCellSize * (0.56 + sample.concentration * 0.38), 1);
+      if (radius <= 0.5) {
+        continue;
+      }
+      drawIrregularBlob(
+        graphics,
+        center,
+        radius,
+        parseHexColor(color, Math.round(255 * regionAlpha * clamp(sample.concentration, 0.22, 0.68) * 0.62)),
+        `${regionId}_mixed_blob_${index}`,
+        7
+      );
     }
   }
 
@@ -262,7 +309,10 @@ export class JadeMaterialRenderer {
       const sample = jade.sampleGrid[index];
       const noise = hashString(`${jade.id}_skin_speckle_${index}`);
       const alpha = 18 + (noise % 38);
-      const radius = 0.9 + ((noise >> 4) % 5) * 0.22;
+      const radius = getSafeRadius(sample, jade.outlinePolygon, 0.72 + ((noise >> 4) % 5) * 0.14, 0.2);
+      if (radius <= 0.2) {
+        continue;
+      }
       const color = noise % 3 === 0 ? new Color(82, 80, 75, alpha) : new Color(204, 199, 187, alpha);
       graphics.circle(sample.x, sample.y, radius);
       graphics.fillColor = color;
@@ -276,8 +326,12 @@ export class JadeMaterialRenderer {
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
       const noise = hashString(`${jade.id}_skin_line_${index}`);
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 0.9) {
+        continue;
+      }
       const angle = ((noise % 180) * Math.PI) / 180;
-      const length = 7 + ((noise >> 4) % 9);
+      const length = Math.min(distance * 1.1, 7 + ((noise >> 4) % 9));
       const alpha = 22 + ((noise >> 8) % 34);
 
       graphics.strokeColor = noise % 2 === 0 ? new Color(88, 85, 78, alpha) : new Color(224, 219, 205, alpha);
@@ -294,11 +348,30 @@ export class JadeMaterialRenderer {
     for (let index = 0; index < jade.sampleGrid.length; index += step) {
       const sample = jade.sampleGrid[index];
       const noise = hashString(`${jade.id}_skin_cloud_${index}`);
-      const radius = jade.sampleCellSize * (1.9 + (noise % 7) * 0.22);
-      graphics.circle(sample.x, sample.y, radius);
-      graphics.fillColor = new Color(107, 104, 96, 10 + ((noise >> 7) % 13));
-      graphics.fill();
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 1.8) {
+        continue;
+      }
+      const angle = ((noise % 360) * Math.PI) / 180;
+      const length = Math.min(distance * 1.2, jade.sampleCellSize * (3.2 + (noise % 7) * 0.22));
+      drawSoftFiber(graphics, sample, angle, length, new Color(107, 104, 96, 16 + ((noise >> 7) % 13)), 2.4);
     }
+  }
+
+  private static drawEdgeDepth(graphics: Graphics, jade: JadePieceData, jadeConfig: JadeConfig, profile: MaterialVisualProfile): void {
+    const center = getCentroid(jade.outlinePolygon);
+    const insetOne = insetPolygon(jade.outlinePolygon, center, 4.2);
+    const insetTwo = insetPolygon(jade.outlinePolygon, center, 9.5);
+
+    drawPolyline(graphics, insetOne, true);
+    graphics.strokeColor = parseHexColor(jadeConfig.baseStrokeColor, jade.materialQualityId === 'stone' ? 70 : 48);
+    graphics.lineWidth = Math.max(1.4, profile.strokeWidth * 0.62);
+    graphics.stroke();
+
+    drawPolyline(graphics, insetTwo, true);
+    graphics.strokeColor = new Color(255, 255, 244, jade.materialQualityId === 'stone' ? 14 : 34);
+    graphics.lineWidth = 1.4;
+    graphics.stroke();
   }
 }
 
@@ -387,6 +460,130 @@ function drawPolygon(graphics: Graphics, points: Vec2Data[]): void {
     graphics.lineTo(points[index].x, points[index].y);
   }
   graphics.close();
+}
+
+function drawPolyline(graphics: Graphics, points: Vec2Data[], closePath: boolean): void {
+  if (points.length === 0) {
+    return;
+  }
+
+  graphics.moveTo(points[0].x, points[0].y);
+  for (let index = 1; index < points.length; index += 1) {
+    graphics.lineTo(points[index].x, points[index].y);
+  }
+  if (closePath) {
+    graphics.close();
+  }
+}
+
+function drawIrregularBlob(graphics: Graphics, center: Vec2Data, radius: number, color: Color, seed: string, pointCount = 9): void {
+  if (radius <= 0) {
+    return;
+  }
+
+  const hash = hashString(seed);
+  const count = Math.max(5, pointCount);
+  graphics.moveTo(center.x + radius, center.y);
+  for (let index = 0; index <= count; index += 1) {
+    const angle = (index / count) * Math.PI * 2;
+    const wobbleHash = hashString(`${hash}_${index}`);
+    const wobble = 0.72 + (wobbleHash % 52) / 100;
+    const localRadius = radius * wobble;
+    const x = center.x + Math.cos(angle) * localRadius;
+    const y = center.y + Math.sin(angle) * localRadius;
+    if (index === 0) {
+      graphics.moveTo(x, y);
+    } else {
+      graphics.lineTo(x, y);
+    }
+  }
+  graphics.close();
+  graphics.fillColor = color;
+  graphics.fill();
+}
+
+function drawSoftFiber(graphics: Graphics, center: Vec2Data, angle: number, length: number, color: Color, width: number): void {
+  if (length <= 0) {
+    return;
+  }
+
+  const half = length * 0.5;
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  graphics.strokeColor = color;
+  graphics.lineWidth = width;
+  graphics.moveTo(center.x - dx * half, center.y - dy * half);
+  graphics.lineTo(center.x + dx * half, center.y + dy * half);
+  graphics.stroke();
+}
+
+function getSafeRadius(center: Vec2Data, outline: Vec2Data[], desiredRadius: number, margin: number): number {
+  if (!isPointInPolygon(center, outline)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(desiredRadius, getDistanceToOutline(center, outline) - margin));
+}
+
+function getDistanceToOutline(point: Vec2Data, outline: Vec2Data[]): number {
+  let minDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < outline.length; index += 1) {
+    const start = outline[index];
+    const end = outline[(index + 1) % outline.length];
+    minDistance = Math.min(minDistance, distanceToSegment(point, start, end));
+  }
+  return minDistance;
+}
+
+function distanceToSegment(point: Vec2Data, start: Vec2Data, end: Vec2Data): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0) {
+    return Math.hypot(point.x - start.x, point.y - start.y);
+  }
+
+  const t = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared, 0, 1);
+  const projectedX = start.x + dx * t;
+  const projectedY = start.y + dy * t;
+  return Math.hypot(point.x - projectedX, point.y - projectedY);
+}
+
+function isPointInPolygon(point: Vec2Data, polygon: Vec2Data[]): boolean {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const currentPoint = polygon[index];
+    const previousPoint = polygon[previous];
+    const intersects =
+      currentPoint.y > point.y !== previousPoint.y > point.y &&
+      point.x < ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) / (previousPoint.y - currentPoint.y) + currentPoint.x;
+    if (intersects) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function getCentroid(points: Vec2Data[]): Vec2Data {
+  if (points.length === 0) {
+    return { x: 0, y: 0 };
+  }
+  const sum = points.reduce(
+    (accumulator, point) => ({ x: accumulator.x + point.x, y: accumulator.y + point.y }),
+    { x: 0, y: 0 }
+  );
+  return { x: sum.x / points.length, y: sum.y / points.length };
+}
+
+function insetPolygon(points: Vec2Data[], center: Vec2Data, distance: number): Vec2Data[] {
+  return points.map((point) => {
+    const dx = center.x - point.x;
+    const dy = center.y - point.y;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    return {
+      x: point.x + (dx / length) * distance,
+      y: point.y + (dy / length) * distance
+    };
+  });
 }
 
 function createCrackBandPoints(crack: CrackData): Vec2Data[] {
