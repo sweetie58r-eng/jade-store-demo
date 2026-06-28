@@ -91,6 +91,22 @@ export class JadeMaterialRenderer {
     }
   }
 
+  public static drawRevealedInterior(
+    graphics: Graphics,
+    jade: JadePieceData,
+    jadeConfig: JadeConfig,
+    colorConfig: ColorConfig,
+    demoLevelConfig: DemoLevelConfig,
+    samples: RevealMaskPointData[],
+    includeRevealPowder = false
+  ): void {
+    const colorById = new Map(colorConfig.colors.map((item) => [item.id, item.displayColor]));
+
+    for (const sample of samples) {
+      this.drawInteriorSample(graphics, sample, jade, jadeConfig, colorConfig, demoLevelConfig, colorById, includeRevealPowder);
+    }
+  }
+
   public static drawJadeSkin(graphics: Graphics, jade: JadePieceData): void {
     drawPolygon(graphics, jade.outlinePolygon);
     graphics.fillColor = getSkinBaseColor(jade.materialQualityId);
@@ -113,36 +129,122 @@ export class JadeMaterialRenderer {
     demoLevelConfig: DemoLevelConfig,
     colorById: Map<string, string>
   ): void {
+    this.drawInteriorSample(graphics, sample, jade, jadeConfig, colorConfig, demoLevelConfig, colorById, true);
+  }
+
+  private static drawInteriorSample(
+    graphics: Graphics,
+    sample: RevealMaskPointData,
+    jade: JadePieceData,
+    jadeConfig: JadeConfig,
+    colorConfig: ColorConfig,
+    demoLevelConfig: DemoLevelConfig,
+    colorById: Map<string, string>,
+    includeRevealPowder: boolean
+  ): void {
+    const profile = getMaterialProfile(jade.materialQualityId);
     const baseRadius = Math.max(2.7, demoLevelConfig.reveal.revealCellSize * 0.8);
     const softRadius = getSafeRadius(sample, jade.outlinePolygon, baseRadius * 1.55, 0.6);
     const safeBaseRadius = getSafeRadius(sample, jade.outlinePolygon, baseRadius * 1.02, 0.4);
     const colorRadius = Math.max(2.5, demoLevelConfig.reveal.revealCellSize * 0.78);
+    const sampleKey = `${jade.id}_${Math.round(sample.x)}_${Math.round(sample.y)}`;
+    const sampleHash = hashString(sampleKey);
+    const baseFill = colorToHex(mixHexColor(jadeConfig.baseFillColor, profile.baseTint, profile.tintAmount, 255));
 
     if (softRadius > 0.5) {
-      drawIrregularBlob(graphics, sample, softRadius, parseHexColor(jadeConfig.baseFillColor, 44), `reveal_soft_${sample.x}_${sample.y}`);
+      const cloudTint = sampleHash % 3 === 0 ? '#edf3e7' : baseFill;
+      drawIrregularBlob(graphics, sample, softRadius, mixHexColor(baseFill, cloudTint, 0.28, 42), `interior_soft_${sampleKey}`);
     }
 
     if (safeBaseRadius > 0.5) {
-      drawIrregularBlob(graphics, sample, safeBaseRadius, parseHexColor(jadeConfig.baseFillColor, 218), `reveal_base_${sample.x}_${sample.y}`);
+      const localTint = sampleHash % 5 === 0 ? '#f4f8ec' : sampleHash % 5 === 1 ? '#aab5a2' : profile.baseTint;
+      drawIrregularBlob(graphics, sample, safeBaseRadius, mixHexColor(baseFill, localTint, 0.08 + (sampleHash % 12) / 180, 218), `interior_base_${sampleKey}`);
     }
+
+    this.drawSampleJadeTexture(graphics, sample, jade, profile, sampleHash);
 
     if (sample.colorId && sample.concentration > 0.035) {
-      const regionColor = colorById.get(sample.colorId) ?? '#ff00ff';
-      const alpha = Math.round(255 * colorConfig.regionAlpha * clamp(sample.concentration * 1.18, 0.14, 1) * 1.08);
-      const radius = getSafeRadius(sample, jade.outlinePolygon, colorRadius * (1.0 + sample.concentration * 0.24), 0.5);
-
-      if (radius > 0.5) {
-        drawIrregularBlob(graphics, sample, radius * 1.18, parseHexColor(regionColor, Math.round(alpha * 0.24)), `reveal_color_soft_${sample.x}_${sample.y}`);
-        drawIrregularBlob(graphics, sample, radius, parseHexColor(regionColor, alpha), `reveal_color_${sample.x}_${sample.y}`);
-      }
+      this.drawSampleColor(graphics, sample, jade, colorConfig, colorById, colorRadius, sampleKey);
     }
 
-    const powderAlpha = 16 + (hashString(`${Math.round(sample.x)}_${Math.round(sample.y)}`) % 16);
-    graphics.strokeColor = new Color(235, 239, 231, powderAlpha);
-    graphics.lineWidth = 1;
-    graphics.moveTo(sample.x - baseRadius * 0.9, sample.y + baseRadius * 0.38);
-    graphics.lineTo(sample.x + baseRadius * 0.78, sample.y + baseRadius * 0.18);
-    graphics.stroke();
+    if (includeRevealPowder) {
+      const powderAlpha = 16 + (sampleHash % 16);
+      graphics.strokeColor = new Color(235, 239, 231, powderAlpha);
+      graphics.lineWidth = 1;
+      graphics.moveTo(sample.x - baseRadius * 0.9, sample.y + baseRadius * 0.38);
+      graphics.lineTo(sample.x + baseRadius * 0.78, sample.y + baseRadius * 0.18);
+      graphics.stroke();
+    }
+  }
+
+  private static drawSampleJadeTexture(
+    graphics: Graphics,
+    sample: RevealMaskPointData,
+    jade: JadePieceData,
+    profile: MaterialVisualProfile,
+    sampleHash: number
+  ): void {
+    const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+    if (distance < jade.sampleCellSize * 0.9) {
+      return;
+    }
+
+    if (sampleHash % 2 === 0) {
+      const angle = ((sampleHash % 180) * Math.PI) / 180;
+      const length = Math.min(distance * 1.1, jade.sampleCellSize * (1.3 + ((sampleHash >> 6) % 8) * 0.18));
+      const alpha = Math.round((profile.hazeAlpha + profile.highlightAlpha + 8) * (0.18 + ((sampleHash >> 11) % 60) / 380));
+      drawSoftFiber(graphics, sample, angle, length, new Color(246, 249, 240, alpha), 0.55 + ((sampleHash >> 15) % 3) * 0.18);
+    }
+
+    if (sampleHash % 5 === 0) {
+      const radius = getSafeRadius(sample, jade.outlinePolygon, 0.55 + ((sampleHash >> 4) % 4) * 0.08, 0.2);
+      if (radius > 0.18) {
+        graphics.circle(sample.x, sample.y, radius);
+        graphics.fillColor = new Color(67, 76, 66, Math.round(profile.grainAlpha * 0.55));
+        graphics.fill();
+      }
+    }
+  }
+
+  private static drawSampleColor(
+    graphics: Graphics,
+    sample: RevealMaskPointData,
+    jade: JadePieceData,
+    colorConfig: ColorConfig,
+    colorById: Map<string, string>,
+    colorRadius: number,
+    sampleKey: string
+  ): void {
+    if (!sample.colorId) {
+      return;
+    }
+
+    const regionColor = colorById.get(sample.colorId) ?? '#ff00ff';
+    const colorVisual = getColorVisual(sample.colorId);
+    const alpha = Math.round(255 * colorConfig.regionAlpha * colorVisual.alphaBoost * clamp(sample.concentration * 1.18, 0.14, 1) * 1.08);
+    const radius = getSafeRadius(sample, jade.outlinePolygon, colorRadius * colorVisual.radiusScale * (1.0 + sample.concentration * 0.24), 0.5);
+
+    if (radius > 0.5) {
+      drawIrregularBlob(graphics, sample, radius * 1.18, parseHexColor(regionColor, Math.round(alpha * 0.24)), `interior_color_soft_${sampleKey}`);
+      drawIrregularBlob(graphics, sample, radius, parseHexColor(regionColor, alpha), `interior_color_${sampleKey}`);
+    }
+
+    if (sample.concentration > 0.36) {
+      const noise = hashString(`interior_root_${sampleKey}`);
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      const angle = colorVisual.rootAngle + (((noise % 80) - 40) * Math.PI) / 180;
+      const length = Math.min(distance * 1.05, jade.sampleCellSize * (1.2 + sample.concentration * 1.8));
+      if (length > 1) {
+        drawSoftFiber(
+          graphics,
+          sample,
+          angle,
+          length,
+          mixHexColor(regionColor, colorVisual.rootTint, colorVisual.rootTintAmount, Math.round(alpha * colorVisual.rootAlpha)),
+          Math.max(0.55, colorVisual.rootWidth * 0.72)
+        );
+      }
+    }
   }
 
   public static drawCrackBand(graphics: Graphics, crack: CrackData): void {
@@ -829,6 +931,14 @@ function parseHexColor(hex: string, alpha: number): Color {
   const green = Number.parseInt(normalized.slice(2, 4), 16);
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   return new Color(red, green, blue, alpha);
+}
+
+function colorToHex(color: Color): string {
+  return `#${toHexByte(color.r)}${toHexByte(color.g)}${toHexByte(color.b)}`;
+}
+
+function toHexByte(value: number): string {
+  return Math.round(clamp(value, 0, 255)).toString(16).padStart(2, '0');
 }
 
 function hashString(value: string): number {

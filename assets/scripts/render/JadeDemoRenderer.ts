@@ -33,11 +33,10 @@ export class JadeDemoRenderer extends Component {
     graphics.clear();
 
     this.drawPortraitStage(graphics);
-    this.drawJadeBase(graphics, jade, jadeConfig);
+    this.drawFullyRevealedJade(graphics, jade, jadeConfig, colorConfig, demoLevelConfig);
     console.log('[JadeDemoBootstrap] jade layer drawn');
-    this.drawColorRegionsFromSamples(graphics, jade, colorConfig);
     console.log('[JadeDemoBootstrap] color regions drawn');
-    this.drawCracks(graphics, jade);
+    this.drawCrackSegmentsOnly(graphics, jade);
     console.log('[JadeDemoBootstrap] cracks drawn');
     this.drawSampleDebug(graphics, jade, colorConfig, demoLevelConfig);
     console.log('[JadeDemoBootstrap] sample grid drawn');
@@ -159,10 +158,6 @@ export class JadeDemoRenderer extends Component {
     return this.graphics;
   }
 
-  private drawJadeBase(graphics: Graphics, jade: JadePieceData, jadeConfig: JadeConfig): void {
-    JadeMaterialRenderer.drawJadeBody(graphics, jade, jadeConfig);
-  }
-
   private drawJadeSkin(graphics: Graphics, jade: JadePieceData): void {
     JadeMaterialRenderer.drawJadeSkin(graphics, jade);
   }
@@ -180,8 +175,15 @@ export class JadeDemoRenderer extends Component {
     graphics.fill();
   }
 
-  private drawColorRegionsFromSamples(graphics: Graphics, jade: JadePieceData, colorConfig: ColorConfig): void {
-    JadeMaterialRenderer.drawColorRegions(graphics, jade, colorConfig);
+  private drawFullyRevealedJade(
+    graphics: Graphics,
+    jade: JadePieceData,
+    jadeConfig: JadeConfig,
+    colorConfig: ColorConfig,
+    demoLevelConfig: DemoLevelConfig
+  ): void {
+    JadeMaterialRenderer.drawRevealedInterior(graphics, jade, jadeConfig, colorConfig, demoLevelConfig, jade.sampleGrid);
+    this.drawJadeSkinOutline(graphics, jade, jadeConfig);
   }
 
   private drawRevealDelta(
@@ -237,6 +239,16 @@ export class JadeDemoRenderer extends Component {
       this.drawCrackBand(graphics, crack);
       this.drawCrackSegments(graphics, crack);
       this.drawCrackBranches(graphics, crack);
+    }
+  }
+
+  private drawCrackSegmentsOnly(graphics: Graphics, jade: JadePieceData): void {
+    for (const crack of jade.cracks) {
+      if (crack.points.length < 2) {
+        continue;
+      }
+
+      this.drawCrackSegments(graphics, crack);
     }
   }
 
