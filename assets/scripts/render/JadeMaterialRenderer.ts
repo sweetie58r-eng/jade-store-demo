@@ -102,6 +102,12 @@ export class JadeMaterialRenderer {
   ): void {
     const colorById = new Map(colorConfig.colors.map((item) => [item.id, item.displayColor]));
 
+    if (!includeRevealPowder) {
+      this.drawJadeBody(graphics, jade, jadeConfig);
+      this.drawColorRegions(graphics, jade, colorConfig);
+      return;
+    }
+
     for (const sample of samples) {
       this.drawInteriorSample(graphics, sample, jade, jadeConfig, colorConfig, demoLevelConfig, colorById, includeRevealPowder);
     }
