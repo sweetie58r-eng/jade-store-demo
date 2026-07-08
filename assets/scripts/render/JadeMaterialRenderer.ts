@@ -26,13 +26,11 @@ export class JadeMaterialRenderer {
     graphics.fillColor = mixHexColor(jadeConfig.baseFillColor, profile.baseTint, profile.tintAmount, 255);
     graphics.fill();
 
-    this.drawLowFrequencyClouds(graphics, jade, profile);
-    this.drawSubsurfaceStrata(graphics, jade, profile);
-    this.drawCottonFibers(graphics, jade, profile);
-    this.drawFineCottonMist(graphics, jade, profile);
+    this.drawProceduralNoiseBase(graphics, jade, profile);
+    this.drawNoiseCottonVeins(graphics, jade, profile);
     this.drawInteriorGrain(graphics, jade, profile);
-    this.drawInteriorHighlights(graphics, jade, profile);
     this.drawEdgeDepth(graphics, jade, jadeConfig, profile);
+    this.drawCutRindEdge(graphics, jade, profile);
 
     drawPolygon(graphics, jade.outlinePolygon);
     graphics.strokeColor = parseHexColor(jadeConfig.baseStrokeColor, 235);
@@ -43,10 +41,10 @@ export class JadeMaterialRenderer {
   public static drawColorRegions(graphics: Graphics, jade: JadePieceData, colorConfig: ColorConfig): void {
     const colorById = new Map(colorConfig.colors.map((item) => [item.id, item.displayColor]));
     const layerSettings = [
-      { threshold: 0.05, maxSamples: 150, radiusMultiplier: 1.42, alphaMultiplier: 0.13 },
-      { threshold: 0.16, maxSamples: 190, radiusMultiplier: 1.08, alphaMultiplier: 0.23 },
-      { threshold: 0.32, maxSamples: 230, radiusMultiplier: 0.76, alphaMultiplier: 0.36 },
-      { threshold: 0.55, maxSamples: 260, radiusMultiplier: 0.52, alphaMultiplier: 0.52 }
+      { threshold: 0.05, maxSamples: 170, radiusMultiplier: 0.92, alphaMultiplier: 0.07 },
+      { threshold: 0.18, maxSamples: 210, radiusMultiplier: 0.74, alphaMultiplier: 0.13 },
+      { threshold: 0.36, maxSamples: 240, radiusMultiplier: 0.56, alphaMultiplier: 0.22 },
+      { threshold: 0.62, maxSamples: 260, radiusMultiplier: 0.42, alphaMultiplier: 0.32 }
     ];
 
     for (const region of jade.colorRegions) {
@@ -79,7 +77,7 @@ export class JadeMaterialRenderer {
             continue;
           }
 
-          drawIrregularBlob(graphics, center, safeRadius, parseHexColor(regionColor, alpha), `${region.id}_${layerIndex}_${index}`);
+          drawIrregularBlob(graphics, center, safeRadius, parseHexColor(regionColor, alpha), `${region.id}_${layerIndex}_${index}`, 7);
         }
       }
 
@@ -210,6 +208,20 @@ export class JadeMaterialRenderer {
         graphics.fill();
       }
     }
+
+    if (sampleHash % 11 === 0) {
+      const radius = getSafeRadius(sample, jade.outlinePolygon, jade.sampleCellSize * (0.8 + ((sampleHash >> 6) % 5) * 0.16), 0.8);
+      if (radius > 1.1) {
+        drawIrregularBlob(
+          graphics,
+          sample,
+          radius,
+          new Color(12, 91, 87, Math.round((profile.hazeAlpha + profile.highlightAlpha) * 0.5)),
+          `interior_water_${sample.x}_${sample.y}`,
+          8
+        );
+      }
+    }
   }
 
   private static drawSampleColor(
@@ -276,26 +288,83 @@ export class JadeMaterialRenderer {
     const alphaScale = options.alphaScale ?? 1;
     const widthScale = options.widthScale ?? 1;
     const mainWidth = Math.max(1, width * widthScale);
-    const edgeAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.22 : 0.15) * alphaScale);
-    const mainAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.56 : 0.4) * alphaScale);
-    const coreAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.18 : 0.06) * alphaScale);
+    const edgeAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.18 : 0.12) * alphaScale);
+    const mainAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.42 : 0.27) * alphaScale);
+    const coreAlpha = Math.round(255 * crack.displayAlpha * (crack.type === 'deep' ? 0.08 : 0.025) * alphaScale);
 
-    graphics.strokeColor = crack.type === 'deep' ? new Color(218, 222, 213, edgeAlpha) : new Color(232, 235, 228, edgeAlpha);
-    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 1.32 : 1.16));
-    drawRaggedLine(graphics, start, end, `${crack.id}_edge_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.18);
+    graphics.strokeColor = crack.type === 'deep' ? new Color(205, 197, 164, edgeAlpha) : new Color(236, 236, 218, edgeAlpha);
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 1.12 : 1.04));
+    drawRaggedLine(graphics, start, end, `${crack.id}_edge_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.22);
 
-    graphics.strokeColor = parseHexColor(crack.displayColor, mainAlpha);
-    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.68 : 0.58));
-    drawRaggedLine(graphics, start, end, `${crack.id}_main_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.26);
+    graphics.strokeColor = crack.type === 'deep' ? new Color(45, 49, 43, mainAlpha) : new Color(87, 96, 84, mainAlpha);
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.42 : 0.34));
+    drawRaggedLine(graphics, start, end, `${crack.id}_main_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.32);
 
-    graphics.strokeColor = parseHexColor('#000000', coreAlpha);
-    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.11 : 0.08));
-    drawRaggedLine(graphics, start, end, `${crack.id}_core_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.18);
+    graphics.strokeColor = parseHexColor('#141815', coreAlpha);
+    graphics.lineWidth = Math.max(1, mainWidth * (crack.type === 'deep' ? 0.055 : 0.04));
+    drawRaggedLine(graphics, start, end, `${crack.id}_core_${start.x}_${start.y}_${end.x}_${end.y}`, mainWidth * 0.2);
   }
 
   public static drawCrackBranch(graphics: Graphics, crack: CrackData, start: Vec2Data, end: Vec2Data): void {
     const width = Math.max(1, crack.width * (crack.type === 'deep' ? 0.22 : 0.16));
     this.drawCrackSegment(graphics, crack, start, end, width, { alphaScale: crack.type === 'deep' ? 0.68 : 0.5 });
+  }
+
+  private static drawProceduralNoiseBase(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 1050));
+    const seedOffsetX = (hashString(`${jade.id}_noise_x`) % 997) * 0.013;
+    const seedOffsetY = (hashString(`${jade.id}_noise_y`) % 991) * 0.011;
+
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 0.55) {
+        continue;
+      }
+
+      const stretchedU = sample.x * 0.018 + sample.y * 0.004 + seedOffsetX;
+      const stretchedV = sample.y * 0.008 - sample.x * 0.002 + seedOffsetY;
+      const low = sampleLayeredNoise(stretchedU, stretchedV, `${jade.id}_low_noise`);
+      const fine = sampleLayeredNoise(sample.x * 0.085 + seedOffsetY, sample.y * 0.07 + seedOffsetX, `${jade.id}_fine_noise`);
+      const value = clamp(low * 0.72 + fine * 0.28, 0, 1);
+      const radius = getSafeRadius(sample, jade.outlinePolygon, jade.sampleCellSize * (0.32 + fine * 0.18), 0.25);
+      if (radius <= 0.18) {
+        continue;
+      }
+
+      if (value > 0.58) {
+        graphics.circle(sample.x, sample.y, radius);
+        graphics.fillColor = new Color(238, 246, 229, Math.round((value - 0.52) * (38 + profile.highlightAlpha * 0.55)));
+        graphics.fill();
+      } else if (value < 0.36) {
+        graphics.circle(sample.x, sample.y, radius * 0.9);
+        graphics.fillColor = new Color(37, 86, 77, Math.round((0.39 - value) * (44 + profile.hazeAlpha * 0.38)));
+        graphics.fill();
+      }
+    }
+  }
+
+  private static drawNoiseCottonVeins(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 125));
+
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 1.6) {
+        continue;
+      }
+
+      const noise = sampleLayeredNoise(sample.x * 0.013, sample.y * 0.021, `${jade.id}_cotton_noise`);
+      if (noise < 0.47 || noise > 0.73) {
+        continue;
+      }
+
+      const hash = hashString(`${jade.id}_noise_vein_${index}`);
+      const angle = -0.18 + (((hash >> 4) % 58) * Math.PI) / 360;
+      const length = Math.min(distance * 0.9, jade.sampleCellSize * (2.4 + ((hash >> 8) % 8) * 0.42));
+      const alpha = Math.round((profile.hazeAlpha + profile.highlightAlpha + 8) * 0.26);
+      drawSoftFiber(graphics, sample, angle, length, new Color(238, 244, 232, alpha), 0.65 + ((hash >> 14) % 3) * 0.18);
+    }
   }
 
   private static drawLowFrequencyClouds(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
@@ -334,6 +403,34 @@ export class JadeMaterialRenderer {
       const alpha = Math.round((profile.hazeAlpha + profile.highlightAlpha) * (0.18 + ((noise >> 8) % 90) / 430));
       const color = noise % 3 === 0 ? new Color(83, 97, 80, alpha) : new Color(244, 248, 237, alpha);
       drawSoftFiber(graphics, sample, angle, length, color, 0.9 + ((noise >> 12) % 3) * 0.38);
+    }
+  }
+
+  private static drawDeepWaterClouds(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 70));
+
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const noise = hashString(`${jade.id}_deep_water_${index}`);
+      if (noise % 5 > 1) {
+        continue;
+      }
+
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 3.2) {
+        continue;
+      }
+
+      const jitter = getJitter(`${jade.id}_deep_water_jitter_${index}`, jade.sampleCellSize * 1.1);
+      const center = { x: sample.x + jitter.x, y: sample.y + jitter.y };
+      const radius = getSafeRadius(center, jade.outlinePolygon, jade.sampleCellSize * (2.8 + ((noise >> 6) % 8) * 0.42), 2.2);
+      if (radius <= 2.2) {
+        continue;
+      }
+
+      const alpha = Math.round((profile.hazeAlpha + profile.highlightAlpha) * (0.22 + ((noise >> 13) % 70) / 360));
+      const color = noise % 2 === 0 ? new Color(8, 88, 86, alpha) : new Color(19, 111, 100, Math.round(alpha * 0.78));
+      drawIrregularBlob(graphics, center, radius, color, `${jade.id}_deep_water_blob_${index}`, 10);
     }
   }
 
@@ -457,6 +554,83 @@ export class JadeMaterialRenderer {
     }
   }
 
+  private static drawCutRindEdge(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    const center = getCentroid(jade.outlinePolygon);
+    const rindOne = insetPolygon(jade.outlinePolygon, center, 2.4);
+    const rindTwo = insetPolygon(jade.outlinePolygon, center, 7.2);
+    const rindThree = insetPolygon(jade.outlinePolygon, center, 12.5);
+
+    drawPolyline(graphics, rindOne, true);
+    graphics.strokeColor = new Color(143, 113, 63, jade.materialQualityId === 'stone' ? 112 : 72);
+    graphics.lineWidth = Math.max(2.6, profile.strokeWidth * 1.05);
+    graphics.stroke();
+
+    drawPolyline(graphics, rindTwo, true);
+    graphics.strokeColor = new Color(202, 171, 94, jade.materialQualityId === 'stone' ? 74 : 46);
+    graphics.lineWidth = Math.max(1.5, profile.strokeWidth * 0.54);
+    graphics.stroke();
+
+    drawOpenArcLikePolyline(graphics, rindThree, 0.55, 0.92);
+    graphics.strokeColor = new Color(92, 72, 47, jade.materialQualityId === 'stone' ? 88 : 52);
+    graphics.lineWidth = Math.max(1.4, profile.strokeWidth * 0.42);
+    graphics.stroke();
+
+    this.drawRindMineralDust(graphics, jade);
+  }
+
+  private static drawRindMineralDust(graphics: Graphics, jade: JadePieceData): void {
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 150));
+
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance > jade.sampleCellSize * 4.4) {
+        continue;
+      }
+
+      const noise = hashString(`${jade.id}_rind_dust_${index}`);
+      const radius = getSafeRadius(sample, jade.outlinePolygon, 0.65 + ((noise >> 3) % 5) * 0.18, 0.25);
+      if (radius <= 0.2) {
+        continue;
+      }
+
+      graphics.circle(sample.x, sample.y, radius);
+      graphics.fillColor = noise % 2 === 0 ? new Color(110, 83, 48, 30 + (noise % 28)) : new Color(219, 186, 107, 22 + (noise % 24));
+      graphics.fill();
+    }
+  }
+
+  private static drawGlossyCutHighlights(graphics: Graphics, jade: JadePieceData, profile: MaterialVisualProfile): void {
+    if (profile.highlightAlpha <= 6) {
+      return;
+    }
+
+    const center = getCentroid(jade.outlinePolygon);
+    const upperHighlight = insetPolygon(jade.outlinePolygon, { x: center.x - 54, y: center.y + 68 }, 15);
+    drawOpenArcLikePolyline(graphics, upperHighlight, 0.12, 0.36);
+    graphics.strokeColor = new Color(255, 255, 238, Math.round(profile.highlightAlpha * 0.86));
+    graphics.lineWidth = 2.2;
+    graphics.stroke();
+
+    const step = Math.max(1, Math.ceil(jade.sampleGrid.length / 34));
+    for (let index = 0; index < jade.sampleGrid.length; index += step) {
+      const sample = jade.sampleGrid[index];
+      const noise = hashString(`${jade.id}_gloss_${index}`);
+      if (noise % 7 > 1) {
+        continue;
+      }
+
+      const distance = getDistanceToOutline(sample, jade.outlinePolygon);
+      if (distance < jade.sampleCellSize * 2.4) {
+        continue;
+      }
+
+      const angle = -0.28 + (((noise >> 6) % 35) * Math.PI) / 360;
+      const length = Math.min(distance * 0.75, jade.sampleCellSize * (2.8 + ((noise >> 12) % 6) * 0.48));
+      drawSoftFiber(graphics, sample, angle, length, new Color(255, 255, 248, Math.round(profile.highlightAlpha * 0.55)), 1.35);
+    }
+  }
+
   private static drawMixedColorAccents(
     graphics: Graphics,
     jade: JadePieceData,
@@ -500,7 +674,7 @@ export class JadeMaterialRenderer {
       if (radius <= 0.2) {
         continue;
       }
-      const color = noise % 3 === 0 ? new Color(82, 80, 75, alpha) : new Color(204, 199, 187, alpha);
+      const color = noise % 3 === 0 ? new Color(76, 56, 34, alpha) : new Color(217, 185, 116, alpha);
       graphics.circle(sample.x, sample.y, radius);
       graphics.fillColor = color;
       graphics.fill();
@@ -521,7 +695,7 @@ export class JadeMaterialRenderer {
       const length = Math.min(distance * 1.1, 7 + ((noise >> 4) % 9));
       const alpha = 22 + ((noise >> 8) % 34);
 
-      graphics.strokeColor = noise % 2 === 0 ? new Color(88, 85, 78, alpha) : new Color(224, 219, 205, alpha);
+      graphics.strokeColor = noise % 2 === 0 ? new Color(84, 63, 39, alpha) : new Color(228, 207, 153, alpha);
       graphics.lineWidth = 1;
       graphics.moveTo(sample.x - Math.cos(angle) * length * 0.5, sample.y - Math.sin(angle) * length * 0.5);
       graphics.lineTo(sample.x + Math.cos(angle) * length * 0.5, sample.y + Math.sin(angle) * length * 0.5);
@@ -541,7 +715,7 @@ export class JadeMaterialRenderer {
       }
       const angle = ((noise % 360) * Math.PI) / 180;
       const length = Math.min(distance * 1.2, jade.sampleCellSize * (3.2 + (noise % 7) * 0.22));
-      drawSoftFiber(graphics, sample, angle, length, new Color(107, 104, 96, 16 + ((noise >> 7) % 13)), 2.4);
+      drawSoftFiber(graphics, sample, angle, length, new Color(103, 75, 42, 18 + ((noise >> 7) % 15)), 2.4);
     }
   }
 
@@ -571,8 +745,8 @@ export class JadeMaterialRenderer {
 function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
   if (materialQualityId === 'glass') {
     return {
-      baseTint: '#f3fbf4',
-      tintAmount: 0.24,
+      baseTint: '#b7efe1',
+      tintAmount: 0.34,
       hazeAlpha: 10,
       grainAlpha: 5,
       grainDensity: 0.28,
@@ -584,8 +758,8 @@ function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
 
   if (materialQualityId === 'icy') {
     return {
-      baseTint: '#edf7ef',
-      tintAmount: 0.18,
+      baseTint: '#9bd8ca',
+      tintAmount: 0.3,
       hazeAlpha: 12,
       grainAlpha: 7,
       grainDensity: 0.4,
@@ -597,8 +771,8 @@ function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
 
   if (materialQualityId === 'fine') {
     return {
-      baseTint: '#deecd9',
-      tintAmount: 0.11,
+      baseTint: '#8ac7b5',
+      tintAmount: 0.24,
       hazeAlpha: 16,
       grainAlpha: 10,
       grainDensity: 0.58,
@@ -610,8 +784,8 @@ function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
 
   if (materialQualityId === 'stone') {
     return {
-      baseTint: '#9ea796',
-      tintAmount: 0.26,
+      baseTint: '#89957f',
+      tintAmount: 0.28,
       hazeAlpha: 30,
       grainAlpha: 28,
       grainDensity: 1.22,
@@ -622,8 +796,8 @@ function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
   }
 
   return {
-    baseTint: '#bcc9b4',
-    tintAmount: 0.18,
+    baseTint: '#9fbda9',
+    tintAmount: 0.24,
     hazeAlpha: 22,
     grainAlpha: 18,
     grainDensity: 0.88,
@@ -635,12 +809,12 @@ function getMaterialProfile(materialQualityId: string): MaterialVisualProfile {
 
 function getSkinBaseColor(materialQualityId: string): Color {
   if (materialQualityId === 'stone') {
-    return new Color(126, 126, 119, 255);
+    return new Color(127, 105, 77, 255);
   }
   if (materialQualityId === 'glass' || materialQualityId === 'icy') {
-    return new Color(151, 154, 145, 250);
+    return new Color(151, 133, 101, 250);
   }
-  return new Color(139, 142, 134, 255);
+  return new Color(140, 122, 91, 255);
 }
 
 function drawPolygon(graphics: Graphics, points: Vec2Data[]): void {
@@ -917,6 +1091,38 @@ function getJitter(seed: string, range: number): Vec2Data {
   const x = (((hash & 0xff) / 255) * 2 - 1) * range;
   const y = ((((hash >> 8) & 0xff) / 255) * 2 - 1) * range;
   return { x, y };
+}
+
+function sampleLayeredNoise(u: number, v: number, seed: string): number {
+  const first = valueNoise2d(u, v, seed);
+  const second = valueNoise2d(u * 2.13 + 7.1, v * 2.07 - 3.4, `${seed}_detail`);
+  const third = valueNoise2d(u * 4.6 - 2.2, v * 3.9 + 5.7, `${seed}_fine`);
+  return clamp(first * 0.58 + second * 0.29 + third * 0.13, 0, 1);
+}
+
+function valueNoise2d(u: number, v: number, seed: string): number {
+  const x0 = Math.floor(u);
+  const y0 = Math.floor(v);
+  const tx = smoothStep(u - x0);
+  const ty = smoothStep(v - y0);
+  const a = gridNoiseValue(x0, y0, seed);
+  const b = gridNoiseValue(x0 + 1, y0, seed);
+  const c = gridNoiseValue(x0, y0 + 1, seed);
+  const d = gridNoiseValue(x0 + 1, y0 + 1, seed);
+  return lerp(lerp(a, b, tx), lerp(c, d, tx), ty);
+}
+
+function gridNoiseValue(x: number, y: number, seed: string): number {
+  return (hashString(`${seed}_${x}_${y}`) & 0xffff) / 0xffff;
+}
+
+function smoothStep(value: number): number {
+  const t = clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function lerp(start: number, end: number, amount: number): number {
+  return start + (end - start) * amount;
 }
 
 function mixHexColor(startHex: string, endHex: string, amount: number, alpha: number): Color {
